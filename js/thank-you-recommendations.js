@@ -85,7 +85,7 @@
             return (
                 '<article class="rec-card">' +
                 '<a class="rec-card__media" href="' + escapeHtml(url) + '">' +
-                '<img src="' + escapeHtml(img) + '" alt="' + escapeHtml(p.name) + '" loading="lazy" width="200" height="150">' +
+                '<img src="' + escapeHtml(img) + '" alt="' + escapeHtml(p.name) + '" class="loaded" width="200" height="150" decoding="async">' +
                 '</a>' +
                 '<div class="rec-card__body">' +
                 tag +
