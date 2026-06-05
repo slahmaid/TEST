@@ -208,21 +208,27 @@
         .model-option strong { display: block; font-size: 1.1rem; color: var(--accent-blue); margin-bottom: 4px; }
         .model-option .model-price { display: block; margin-top: 10px; font-weight: 900; color: #d90429; font-size: clamp(1.25rem, 4vw, 1.55rem); line-height: 1.2; }
 
-        .projector-video-wrap {
-            max-width: min(100%, 560px);
+        .short-video-wrap {
             margin: 0 auto;
-            aspect-ratio: 1 / 1;
-            border-radius: 20px;
+            max-width: 360px;
+            text-align: center;
+        }
+        .short-video-embed {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 9 / 16;
+            border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 15px 40px rgba(0,0,0,.1);
             background: #111;
+            box-shadow: 0 12px 32px rgba(32, 40, 149, 0.12);
             border: 1px solid #eee;
         }
-        .projector-video-wrap video {
+        .short-video-embed iframe {
+            position: absolute;
+            inset: 0;
             width: 100%;
             height: 100%;
-            object-fit: cover;
-            display: block;
+            border: 0;
         }
 
         .qty-group { margin-bottom: 16px; margin-top: 4px; }
@@ -519,17 +525,17 @@
         <section class="gallery-section">
             <div class="container">
                 <div class="section-divider"><h2>شاهد البروجيكتور فيديو</h2></div>
-                <div class="projector-video-wrap">
-                    <video
-                        class="projector-video"
-                        src="images/Projector-Video.mp4"
-                        title="فيديو بروجيكتور Prumysl الشمسي"
-                        playsinline
-                        muted
-                        loop
-                        controls
-                        preload="metadata"
-                    ></video>
+                <div class="short-video-wrap">
+                    <div class="short-video-embed">
+                        <iframe
+                            src="https://www.youtube-nocookie.com/embed/lXk15hGQigU?rel=0&amp;modestbranding=1"
+                            title="فيديو بروجيكتور Prumysl الشمسي"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowfullscreen
+                            loading="lazy"
+                            referrerpolicy="strict-origin-when-cross-origin"
+                        ></iframe>
+                    </div>
                 </div>
                 <div class="features-cta-wrap">
                     <a href="#order" class="submit-btn features-cta-btn">اطلب دابا 👇 اش كاتسنا</a>
