@@ -931,51 +931,6 @@
             .conn-grid{ grid-template-columns: 1fr; }
         }
 
-        .mobile-cta {
-            position: fixed;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            z-index: 2000;
-            background: rgba(255,255,255,0.92);
-            backdrop-filter: blur(10px);
-            border-top: 1px solid rgba(0,0,0,0.08);
-            padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-            display: none;
-        }
-        .mobile-cta .cta-wrap {
-            max-width: 600px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 8px;
-        }
-        .mobile-cta .mini {
-            font-size: 0.78rem;
-            font-weight: 900;
-            color: #222;
-            text-align: center;
-        }
-        .mobile-cta .mini b { color: var(--accent-blue); }
-        .mobile-cta .mini .mini-price {
-            color: #e53935;
-            font-size: 1.22em;
-            font-weight: 900;
-        }
-        .mobile-cta .cta-btn {
-            width: 100%;
-            border: none;
-            border-radius: 14px;
-            padding: 14px 14px;
-            font-size: 1.05rem;
-            font-weight: 900;
-            cursor: pointer;
-            background: var(--success-green);
-            color: #fff;
-            box-shadow: 0 4px 0 #1e7e34;
-        }
-        .mobile-cta .cta-btn:active { transform: translateY(1px); box-shadow: 0 2px 0 #1e7e34; }
-
         html { scroll-behavior: smooth; }
     </style>
 </head>
@@ -1314,13 +1269,6 @@
         title="تواصل عبر واتساب"
     ><img src="images/whatsapp.png" alt="WhatsApp"></a>
 
-    <div class="mobile-cta" id="mobileCta">
-        <div class="cta-wrap">
-            <div class="mini">🚚 من <b class="mini-price">1199 درهم</b> — توصيل مجاني <b>+ الدفع عند الاستلام</b></div>
-            <button class="cta-btn" type="button" id="goToOrder">اطلب دابا ✅</button>
-        </div>
-    </div>
-
     <script src="js/order-conversion.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js" defer></script>
     <script src="js/scroll-reveal.js" defer></script>
@@ -1386,27 +1334,6 @@
             };
             tick();
             setInterval(tick, 1000);
-        })();
-
-        // Sticky Mobile CTA Scroll behavior
-        (function(){
-            const cta = document.getElementById('mobileCta');
-            const btn = document.getElementById('goToOrder');
-            const order = document.getElementById('order');
-            if(!cta || !btn || !order) return;
-
-            const isSmall = () => window.matchMedia('(max-width: 480px)').matches;
-
-            btn.addEventListener('click', () => {
-                order.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            });
-
-            window.addEventListener('scroll', () => {
-                if(!isSmall()) { cta.style.display = 'none'; return; }
-                const rect = order.getBoundingClientRect();
-                const inView = rect.top < window.innerHeight && rect.bottom > 0;
-                cta.style.display = inView ? 'none' : 'block';
-            });
         })();
 
         // Meta Pixel: every click on call / WhatsApp between header and hero (totals in Events Manager → Custom events)

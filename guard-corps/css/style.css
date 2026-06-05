@@ -557,14 +557,6 @@ img {
     display: block;
     object-fit: contain;
 }
-@media (max-width: 480px) {
-    .guard-corps-page .whatsapp-float,
-    .moka-page .whatsapp-float,
-    .moka-lineup-page .whatsapp-float {
-        bottom: 90px;
-    }
-}
-
 /* --- RESPONSIVE MEDIA QUERIES (GLOBAL) --- */
 @media (max-width: 768px) {
     /* Smooth scroll offset for sticky header */

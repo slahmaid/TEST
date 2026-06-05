@@ -366,23 +366,6 @@
         .badge-icon { font-size: 1.8rem; display: block; margin-bottom: 8px; }
         .copyright { text-align: center; font-size: .85rem; color: #aaa; border-top: 1px solid #f5f5f5; padding-top: 20px; }
 
-        .whatsapp-float { position: fixed; bottom: 80px; left: 16px; z-index: 1500; width: 56px; height: 56px; border-radius: 50%; box-shadow: 0 4px 14px rgba(0,0,0,.2); }
-        .whatsapp-float img { width: 100%; height: 100%; object-fit: contain; }
-
-        .mobile-cta { position: fixed; left: 0; right: 0; bottom: 0; z-index: 2000; background: rgba(255,255,255,.92); backdrop-filter: blur(10px); border-top: 1px solid rgba(0,0,0,.08); padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); display: none; }
-        .mobile-cta .cta-wrap { max-width: 600px; margin: 0 auto; }
-        .mobile-cta .mini { font-size: .78rem; font-weight: 900; text-align: center; margin-bottom: 8px; }
-        .mobile-cta .mini-price {
-            color: #e53935;
-            font-size: 1.15em;
-            display: inline-block;
-            animation: pricePulse 1.4s ease-in-out infinite;
-        }
-        @media (prefers-reduced-motion: reduce) {
-            .mobile-cta .mini-price { animation: none; }
-        }
-        .mobile-cta .cta-btn { width: 100%; border: none; border-radius: 14px; padding: 14px; font-size: 1.05rem; font-weight: 900; cursor: pointer; background: var(--success-green); color: #fff; box-shadow: 0 4px 0 #1e7e34; }
-
         html { scroll-behavior: smooth; }
 
         @media (max-width: 768px) {
@@ -738,13 +721,6 @@
 
     <a class="whatsapp-float" href="https://api.whatsapp.com/send?phone=212723496854&amp;text=%D8%B3%D9%84%D8%A7%D9%85%D8%8C%20%D8%A8%D8%BA%D9%8A%D8%AA%20%D9%86%D8%B3%D8%AA%D9%81%D8%B3%D8%B1%20%D8%B9%D9%84%D9%89%20%D9%83%D8%A7%D9%85%D9%8A%D8%B1%D8%A7%20%D8%A7%D9%84%D8%B5%D9%82%D8%B1" target="_blank" rel="noopener noreferrer" aria-label="واتساب"><img src="images/whatsapp.png" alt="WhatsApp"></a>
 
-    <div class="mobile-cta" id="mobileCta">
-        <div class="cta-wrap">
-            <div class="mini">🚚 من <b class="mini-price">1999 درهم</b> — توصيل مجاني + الدفع عند الاستلام</div>
-            <button class="cta-btn" type="button" id="goToOrder">اطلب الصقر دابا ✅</button>
-        </div>
-    </div>
-
     <script src="js/ads-config.js"></script>
     <script src="js/order-conversion.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js" defer></script>
@@ -820,21 +796,6 @@
             };
             tick();
             setInterval(tick, 1000);
-        })();
-
-        (function () {
-            const cta = document.getElementById('mobileCta');
-            const btn = document.getElementById('goToOrder');
-            const order = document.getElementById('order');
-            if (!cta || !btn || !order) return;
-            const isSmall = () => window.matchMedia('(max-width: 480px)').matches;
-            btn.addEventListener('click', () => order.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-            window.addEventListener('scroll', () => {
-                if (!isSmall()) { cta.style.display = 'none'; return; }
-                const rect = order.getBoundingClientRect();
-                const inView = rect.top < window.innerHeight && rect.bottom > 0;
-                cta.style.display = inView ? 'none' : 'block';
-            });
         })();
 
         document.querySelectorAll('input[name="phone"]').forEach(phoneInput => {
