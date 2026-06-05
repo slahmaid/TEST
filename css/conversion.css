@@ -1,0 +1,112 @@
+/* Prumysl — conversion-focused layout */
+
+.order-fold-bullets {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin: 0 0 16px;
+}
+
+.order-fold-bullets__pill {
+    background: #fff;
+    border: 1px solid rgba(32, 40, 149, 0.14);
+    color: #202895;
+    font-weight: 800;
+    font-size: 0.82rem;
+    padding: 8px 12px;
+    border-radius: 999px;
+    box-shadow: 0 4px 12px rgba(32, 40, 149, 0.06);
+}
+
+.city-select {
+    width: 100%;
+    padding: 12px 14px;
+    border: 2px solid #e6e6e6;
+    border-radius: 12px;
+    font-family: 'Cairo', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    background: #fff;
+    color: #111;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23202895' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: left 14px center;
+    padding-left: 36px;
+}
+
+[dir="ltr"] .city-select {
+    background-position: right 14px center;
+    padding-left: 14px;
+    padding-right: 36px;
+}
+
+.city-select:focus {
+    outline: none;
+    border-color: #202895;
+    box-shadow: 0 0 0 4px rgba(32, 40, 149, 0.1);
+}
+
+.form-group input.field-invalid,
+.form-group select.field-invalid {
+    border-color: #e63946 !important;
+    box-shadow: 0 0 0 3px rgba(230, 57, 70, 0.15) !important;
+}
+
+.mobile-cta--enhanced {
+    display: none;
+    box-shadow: 0 -8px 28px rgba(32, 40, 149, 0.12);
+}
+
+.mobile-cta--enhanced .cta-btn {
+    background: linear-gradient(180deg, #2a35b8 0%, #202895 100%) !important;
+    box-shadow: 0 4px 0 #151a5e !important;
+}
+
+.mobile-cta--enhanced .mini {
+    line-height: 1.45;
+}
+
+@media (max-width: 768px) {
+    body.order-fold-compact .order-section .seo-h1-product,
+    body.order-fold-compact .order-section .order-subtitle {
+        display: none;
+    }
+
+    body.order-fold-compact .order-section .seo-h1-cta,
+    body.order-fold-compact .order-section .order-title:not(.seo-main-heading) .seo-h1-cta {
+        display: block;
+        margin-bottom: 8px;
+    }
+
+    body.order-fold-compact .order-section .urgency-box .line2 {
+        display: none;
+    }
+
+    body.order-fold-compact .order-section {
+        padding-top: 16px;
+    }
+
+    body.order-fold-compact .hero-section {
+        padding-top: 8px;
+    }
+
+    body.order-fold-compact .hero-section img,
+    body.order-fold-compact .hero-section picture img {
+        max-height: 42vh;
+        object-fit: cover;
+        width: 100%;
+    }
+
+    .order-section {
+        padding-bottom: calc(88px + env(safe-area-inset-bottom));
+    }
+}
+
+@media (min-width: 769px) {
+    .mobile-cta--enhanced {
+        display: none !important;
+    }
+}

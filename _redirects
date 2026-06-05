@@ -1,0 +1,11 @@
+# Netlify / Cloudflare Pages — clean URLs (301 removes index.html from links)
+/index.html /
+/moka/index.html /moka/ 301
+/moka-pro-max/index.html /moka-pro-max/ 301
+/saqr/index.html /saqr/ 301
+/projectors/index.html /projectors/ 301
+/moka/thank-you/index.html /moka/thank-you/ 301
+/moka-pro-max/thank-you/index.html /moka-pro-max/thank-you/ 301
+/saqr/thank-you/index.html /saqr/thank-you/ 301
+/projectors/thank-you/index.html /projectors/thank-you/ 301
+/admin/index.html /admin/ 301

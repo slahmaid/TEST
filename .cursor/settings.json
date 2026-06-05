@@ -1,0 +1,25 @@
+{
+  "plugins": {
+    "wix": {
+      "enabled": false
+    },
+    "gsap-skills": {
+      "enabled": true
+    },
+    "browserstack": {
+      "enabled": true
+    },
+    "gitlab": {
+      "enabled": true
+    },
+    "figma": {
+      "enabled": true
+    },
+    "tldraw": {
+      "enabled": true
+    },
+    "superpowers": {
+      "enabled": true
+    }
+  }
+}
