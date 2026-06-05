@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Thank-you conversion: real order only. Meta Purchase + TikTok Purchase/CompletePayment.
  * Campaign toggles apply on landing pages (InitiateCheckout), not here.
  */
@@ -10,8 +10,8 @@
         if (meta.isSaqr) return 'saqr';
         var k = meta.key || '';
         if (k === 'projectors' || k === 'projector' || k === '300w' || k === '400w') return 'projectors';
-        if (k === 'guard-corps' || k.indexOf('guard') !== -1) return 'guard-corps';
-        if (k === 'moka-pro-max' || k === '1_camera' || k === '2_camera') return 'moka-pro-max';
+        if (k === 'guard-corps' || k === '1_camera' || k === '2_camera') return 'guard-corps';
+        if (k.indexOf('guard') !== -1) return 'guard-corps';
         if (k.indexOf('moka') !== -1) return 'moka';
         return null;
     }

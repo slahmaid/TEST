@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
@@ -266,7 +266,7 @@
                 <div class="cta-row">
                     <a class="cta-btn cta-btn--wa" id="waLink" href="https://api.whatsapp.com/send?phone=212723496854" target="_blank" rel="noopener noreferrer">تواصل عبر واتساب</a>
                     <a class="cta-btn cta-btn--call" href="tel:+212723496854" dir="ltr">اتصل بنا</a>
-                    <a class="cta-btn cta-btn--back" id="backLink" href="../">العودة لصفحة الصقر</a>
+                    <a class="cta-btn cta-btn--back" id="backLink" href="../">العودة لصفحة Guard Corps</a>
                 </div>
             </div>
         </div>
@@ -285,15 +285,16 @@
     <script src="../js/thank-you-conversion.js"></script>
     <script>
         const SAQR_UNIT = 1999;
+        const GUARD_CORPS_UNIT = 1199;
         const MOKA_UNIT = 699;
         const PROJECTOR_300 = 699;
         const PROJECTOR_400 = 799;
         const PRODUCT_META = {
             saqr: { label: 'كاميرا الصقر — 4G', contentId: 'SAQR-36X-4G', unit: SAQR_UNIT, back: '../', thumb: '../images/Saqr.jpeg', thumbAlt: 'كاميرا Prumysl الصقر', isSaqr: true },
             saqr_4g: { label: 'كاميرا الصقر — 4G', contentId: 'SAQR-36X-4G', unit: SAQR_UNIT, back: '../', thumb: '../images/Saqr.jpeg', thumbAlt: 'كاميرا Prumysl الصقر', isSaqr: true },
-            '1_camera': { label: 'موكا برو ماكس', contentId: 'MOKA-PRO-MAX', unit: MOKA_UNIT, back: '../', thumb: '../images/MOKA.jpg', thumbAlt: 'موكا برو ماكس', isSaqr: false },
-            '2_camera': { label: 'موكا برو ماكس (×2)', contentId: 'MOKA-PRO-MAX', unit: MOKA_UNIT * 2, back: '../', thumb: '../images/MOKA.jpg', thumbAlt: 'موكا برو ماكس', isSaqr: false },
-            'moka-pro-max': { label: 'موكا برو ماكس', contentId: 'MOKA-PRO-MAX', unit: MOKA_UNIT, back: '../', thumb: '../images/MOKA.jpg', thumbAlt: 'موكا برو ماكس', isSaqr: false },
+            '1_camera': { label: 'كاميرا Guard Corps', contentId: 'GUARD-CORPS-4G-TRIPLE', unit: GUARD_CORPS_UNIT, back: '../', thumb: '../images/MOKA.jpg', thumbAlt: 'كاميرا Guard Corps', isSaqr: false },
+            '2_camera': { label: 'كاميرا Guard Corps (×2)', contentId: 'GUARD-CORPS-4G-TRIPLE', unit: GUARD_CORPS_UNIT * 2, back: '../', thumb: '../images/MOKA.jpg', thumbAlt: 'كاميرا Guard Corps', isSaqr: false },
+            'guard-corps': { label: 'كاميرا Guard Corps', contentId: 'GUARD-CORPS-4G-TRIPLE', unit: GUARD_CORPS_UNIT, back: '../', thumb: '../images/MOKA.jpg', thumbAlt: 'كاميرا Guard Corps', isSaqr: false },
             projectors: { label: 'بروجيكتور شمسي', contentId: 'PROJECTOR-SOLAR', unit: PROJECTOR_300, back: '../', thumb: '../images/300W.webp', thumbAlt: 'بروجيكتور Prumysl الشمسي', isSaqr: false },
             projector: { label: 'بروجيكتور شمسي', contentId: 'PROJECTOR-SOLAR', unit: PROJECTOR_300, back: '../', thumb: '../images/300W.webp', thumbAlt: 'بروجيكتور Prumysl الشمسي', isSaqr: false },
             '300w': { label: 'بروجيكتور شمسي 300 واط', contentId: 'PROJECTOR-300W', unit: PROJECTOR_300, back: '../', thumb: '../images/300W.webp', thumbAlt: 'بروجيكتور 300W', isSaqr: false },
@@ -311,13 +312,14 @@
         }
 
         function resolveProduct(raw) {
-            const key = (raw || 'saqr').trim().toLowerCase();
+            const key = (raw || 'guard-corps').trim().toLowerCase();
             if (PRODUCT_META[key]) return { key: key, ...PRODUCT_META[key] };
             if (key.includes('saqr')) return { key: 'saqr', ...PRODUCT_META.saqr };
             if (key.includes('projector') || key === '300w' || key === '400w') {
                 if (PRODUCT_META[key]) return { key: key, ...PRODUCT_META[key] };
                 return { key: 'projectors', ...PRODUCT_META.projectors };
             }
+            if (key.includes('guard')) return { key: 'guard-corps', ...PRODUCT_META['guard-corps'] };
             if (key.includes('moka') || key === '1_camera' || key === '2_camera') {
                 return { key: key, ...PRODUCT_META['1_camera'] };
             }
@@ -329,14 +331,12 @@
             let value = parseInt(priceOverride, 10);
             if (!value || Number.isNaN(value)) {
                 if (meta.key === '2_camera') {
-                    value = MOKA_UNIT * 2;
+                    value = (meta.unit || GUARD_CORPS_UNIT) * 2;
                     qtyNum = 2;
                 } else if (meta.isSaqr) {
                     value = SAQR_UNIT * qtyNum;
-                } else if (meta.key === '1_camera') {
-                    value = MOKA_UNIT;
                 } else {
-                    value = (meta.unit || SAQR_UNIT) * qtyNum;
+                    value = (meta.unit || GUARD_CORPS_UNIT) * qtyNum;
                 }
             }
             return {
@@ -351,7 +351,7 @@
         function initThankYou() {
             const p = getParams();
             const name = (p.get('name') || '').trim();
-            const productRaw = p.get('product') || 'saqr';
+            const productRaw = p.get('product') || 'guard-corps';
             const modelRaw = (p.get('model') || '').trim().toLowerCase();
             let meta = resolveProduct(modelRaw && PRODUCT_META[modelRaw] ? modelRaw : productRaw);
             if (modelRaw && (modelRaw === '300w' || modelRaw === '400w')) {

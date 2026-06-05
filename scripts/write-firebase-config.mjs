@@ -44,6 +44,7 @@ const targets = [
   'js/firebase-config.js',
   'moka/js/firebase-config.js',
   'moka-pro-max/js/firebase-config.js',
+  'guard-corps/js/firebase-config.js',
   'saqr/js/firebase-config.js',
   'projectors/js/firebase-config.js'
 ];

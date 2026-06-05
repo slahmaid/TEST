@@ -3,6 +3,6 @@
   "private": true,
   "scripts": {
     "serve": "node scripts/serve.mjs",
-    "validate:html": "npx html-validate@9.4.0 index.html moka/index.html moka-pro-max/index.html saqr/index.html projectors/index.html"
+    "validate:html": "npx html-validate@9.4.0 index.html moka/index.html moka-pro-max/index.html guard-corps/index.html saqr/index.html projectors/index.html"
   }
 }

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Google Sheet + Firestore orders (works on prumysl.cc even without firebase-config.js on the same host).
  * Config is loaded from the GitHub Pages Actions deploy when local config is missing.
  */
@@ -83,7 +83,6 @@
         try {
             var path = (global.location && global.location.pathname) || '';
             if (path.indexOf('guard-corps') !== -1) return 'guard-corps';
-            if (path.indexOf('moka-pro-max') !== -1) return 'moka-pro-max';
             if (path.indexOf('/moka') !== -1) return 'moka';
             if (path.indexOf('saqr') !== -1) return 'saqr';
             if (path.indexOf('projector') !== -1) return 'projectors';
@@ -114,7 +113,6 @@
             var labels = {
                 moka: 'كاميرا موكا',
                 'guard-corps': 'كاميرا Guard Corps',
-                'moka-pro-max': 'موكا برو ماكس',
                 saqr: 'كاميرا الصقر',
                 projectors: 'بروجيكتور شمسي'
             };

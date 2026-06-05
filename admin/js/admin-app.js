@@ -34,6 +34,7 @@
     var PRODUCT_CATALOG = [
         { name: 'كاميرا موكا', unitPrice: 599 },
         { name: 'موكا برو ماكس', unitPrice: 699 },
+        { name: 'كاميرا Guard Corps', unitPrice: 1199 },
         { name: 'كاميرا الصقر', unitPrice: 1999 },
         { name: 'بروجيكتور شمسي 300 واط', unitPrice: 699 },
         { name: 'بروجيكتور شمسي 400 واط', unitPrice: 799 },
