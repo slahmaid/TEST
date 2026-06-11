@@ -1,5 +1,5 @@
 /**
- * Related products on thank-you pages — all catalog items except Guard Corps and the current product.
+ * Related products on thank-you pages — all catalog items except the current product.
  */
 (function (global) {
     var PRODUCTS = [
@@ -22,6 +22,15 @@
             tag: 'الأكثر مبيعاً'
         },
         {
+            id: 'guard-corps',
+            name: 'كاميرا Guard Corps',
+            desc: '3 عدسات PTZ، 15MP، 4G فقط',
+            price: '1199 درهم',
+            image: 'guard-corps/images/Guardcorp.jpeg',
+            href: 'guard-corps/',
+            tag: '3 شاشات حية'
+        },
+        {
             id: 'saqr',
             name: 'كاميرا الصقر',
             desc: 'زووم بصري 36×، 24MP، 4G',
@@ -40,8 +49,6 @@
             tag: 'إضاءة خارجية'
         }
     ];
-
-    var EXCLUDED = ['guard-corps'];
 
     function detectCurrentProduct() {
         var path = (global.location && global.location.pathname) || '';
@@ -67,7 +74,7 @@
 
         var current = detectCurrentProduct();
         var items = PRODUCTS.filter(function (p) {
-            return EXCLUDED.indexOf(p.id) === -1 && p.id !== current;
+            return p.id !== current;
         });
 
         if (!items.length) {

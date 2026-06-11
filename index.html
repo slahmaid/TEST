@@ -679,12 +679,53 @@
             }
         }
 
+        @media (max-width: 767px) {
+            .product-card--featured-mobile {
+                grid-column: 1 / -1;
+            }
+            .product-card--featured-mobile .product-card__media {
+                aspect-ratio: 1 / 1;
+            }
+            .product-card--featured-mobile .product-card__body {
+                padding: 16px 16px 18px;
+                align-items: center;
+                text-align: center;
+            }
+            .product-card--featured-mobile .product-card__tag {
+                align-self: center;
+            }
+            .product-card--featured-mobile h3 {
+                font-size: 1.05rem;
+            }
+            .product-card--featured-mobile .product-card__desc {
+                font-size: 0.85rem;
+                line-height: 1.55;
+            }
+            .product-card--featured-mobile .product-card__footer {
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                width: 100%;
+            }
+            .product-card--featured-mobile .product-card__price {
+                font-size: 1.2rem;
+            }
+        }
+
         @media (max-width: 480px) {
             .contact-quick-inner { gap: 8px; }
             .contact-quick-btn { padding: 10px 6px; font-size: 0.72rem; }
             .product-card h3 { font-size: 0.88rem; }
+            .product-card--featured-mobile h3 { font-size: 1.02rem; }
             .product-card__cta { width: 100%; }
             .product-card__footer { flex-direction: column; align-items: stretch; }
+            .product-card--featured-mobile .product-card__footer {
+                align-items: center;
+            }
+            .product-card--featured-mobile .product-card__cta {
+                width: auto;
+                min-width: 180px;
+            }
         }
 
     </style>
@@ -791,6 +832,21 @@
                             <div class="product-card__footer">
                                 <div class="product-card__price">من 699 <small>درهم</small></div>
                                 <a class="product-card__cta" href="projectors/">عرض التفاصيل</a>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="product-card product-card--featured-mobile">
+                        <a class="product-card__media" href="guard-corps/">
+                            <img src="guard-corps/images/Guardcorp.jpeg" alt="كاميرا Guard Corps الشمسية 4G — Prumysl" width="400" height="300" loading="lazy" decoding="async">
+                        </a>
+                        <div class="product-card__body">
+                            <span class="product-card__tag">جديد</span>
+                            <h3>كاميرا Guard Corps</h3>
+                            <p class="product-card__desc">3 عدسات PTZ، 15MP، 4G، لوحان شمسيان 16W — 3 شاشات حية في V380 Pro.</p>
+                            <div class="product-card__footer">
+                                <div class="product-card__price">1199 <small>درهم</small></div>
+                                <a class="product-card__cta" href="guard-corps/">عرض التفاصيل</a>
                             </div>
                         </div>
                     </article>

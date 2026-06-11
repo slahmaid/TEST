@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
 
-    <title>شكراً لطلبك | Prumysl</title>
-    <meta name="description" content="تم استلام طلبك بنجاح. سيتواصل معك فريق Prumysl قريباً لتأكيد الطلب.">
+    <title>شكراً لطلبك | بروجيكتور 2.0 Prumysl</title>
+    <meta name="description" content="تم استلام طلب البروجيكتور بنجاح. سيتواصل معك فريق Prumysl قريباً لتأكيد الطلب.">
 
     <meta name="theme-color" content="#202895">
 
@@ -48,7 +48,6 @@
             --accent-blue: #202895;
             --success-green: #28a745;
             --bg-light: #f8f9fa;
-            --danger-red: #e63946;
             --soft-blue: #f4f5ff;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Cairo', sans-serif; }
@@ -187,8 +186,10 @@
             border-radius: 16px;
             overflow: hidden;
             box-shadow: 0 8px 24px rgba(0,0,0,.08);
+            aspect-ratio: 1;
+            background: #eee;
         }
-        .product-thumb img { width: 100%; height: auto; display: block; }
+        .product-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
         footer {
             background: #fff;
@@ -227,12 +228,12 @@
                 <div class="success-icon" aria-hidden="true">✓</div>
                 <h1 id="thankTitle">شكراً لك!</h1>
                 <p class="lead" id="thankLead">
-                    تم استلام طلبك بنجاح. سيتصل بك فريقنا في أقرب وقت
+                    تم استلام طلب البروجيكتور بنجاح. سيتصل بك فريقنا في أقرب وقت
                     <strong>(غالباً خلال 24 ساعة)</strong> لتأكيد العنوان وموعد التوصيل.
                 </p>
 
                 <div class="product-thumb" id="productThumb">
-                    <img id="productThumbImg" src="../images/Guardcorp.jpeg" alt="كاميرا Guard Corps" class="loaded" width="280" height="187">
+                    <img id="productThumbImg" src="../images/300W.webp" alt="بروجيكتور Prumysl الشمسي" width="280" height="280" onerror="this.onerror=null;this.src='https://slahmaid.github.io/ARVADIS/img/Projectors/300W.webp'">
                 </div>
 
                 <div class="order-summary" id="orderSummary">
@@ -247,7 +248,7 @@
                     </div>
                     <div class="summary-row">
                         <span>الكمية</span>
-                        <span id="summaryQty">1</span>
+                        <span id="summaryQty">1 بروجيكتور</span>
                     </div>
                     <div class="summary-row summary-row--total">
                         <span>المجموع (الدفع عند الاستلام)</span>
@@ -261,13 +262,14 @@
                         <li>غادي نعاودو نتاصلوا بيك على الهاتف لتأكيد الطلب</li>
                         <li>التوصيل مجاني لجميع مدن المغرب</li>
                         <li>كتخلّص غير ملي توصلك الطلبية — الدفع عند الاستلام</li>
+                        <li>ضمان 3 سنوات على البروجيكتور</li>
                     </ul>
                 </div>
 
                 <div class="cta-row">
                     <a class="cta-btn cta-btn--wa" id="waLink" href="https://api.whatsapp.com/send?phone=212723496854" target="_blank" rel="noopener noreferrer">تواصل عبر واتساب</a>
                     <a class="cta-btn cta-btn--call" href="tel:+212723496854" dir="ltr">اتصل بنا</a>
-                    <a class="cta-btn cta-btn--back" id="backLink" href="../">العودة لصفحة Guard Corps</a>
+                    <a class="cta-btn cta-btn--back" href="../">العودة لصفحة بروجيكتور 2.0</a>
                 </div>
             </div>
         </div>
@@ -285,21 +287,9 @@
     <script src="../js/fbq-purchase.js"></script>
     <script src="../js/thank-you-conversion.js"></script>
     <script>
-        const SAQR_UNIT = 1999;
-        const GUARD_CORPS_UNIT = 1199;
-        const MOKA_UNIT = 699;
-        const PROJECTOR_300 = 699;
-        const PROJECTOR_400 = 799;
-        const PRODUCT_META = {
-            saqr: { label: 'كاميرا الصقر — 4G', contentId: 'SAQR-36X-4G', unit: SAQR_UNIT, back: '../', thumb: '../images/Saqr.jpeg', thumbAlt: 'كاميرا Prumysl الصقر', isSaqr: true },
-            saqr_4g: { label: 'كاميرا الصقر — 4G', contentId: 'SAQR-36X-4G', unit: SAQR_UNIT, back: '../', thumb: '../images/Saqr.jpeg', thumbAlt: 'كاميرا Prumysl الصقر', isSaqr: true },
-            '1_camera': { label: 'كاميرا Guard Corps', contentId: 'GUARD-CORPS-4G-TRIPLE', unit: GUARD_CORPS_UNIT, back: '../', thumb: '../images/Guardcorp.jpeg', thumbAlt: 'كاميرا Guard Corps', isSaqr: false },
-            '2_camera': { label: 'كاميرا Guard Corps (×2)', contentId: 'GUARD-CORPS-4G-TRIPLE', unit: GUARD_CORPS_UNIT * 2, back: '../', thumb: '../images/Guardcorp.jpeg', thumbAlt: 'كاميرا Guard Corps', isSaqr: false },
-            'guard-corps': { label: 'كاميرا Guard Corps', contentId: 'GUARD-CORPS-4G-TRIPLE', unit: GUARD_CORPS_UNIT, back: '../', thumb: '../images/Guardcorp.jpeg', thumbAlt: 'كاميرا Guard Corps', isSaqr: false },
-            projectors: { label: 'بروجيكتور شمسي', contentId: 'PROJECTOR-SOLAR', unit: PROJECTOR_300, back: '../', thumb: '../images/300W.webp', thumbAlt: 'بروجيكتور Prumysl الشمسي', isSaqr: false },
-            projector: { label: 'بروجيكتور شمسي', contentId: 'PROJECTOR-SOLAR', unit: PROJECTOR_300, back: '../', thumb: '../images/300W.webp', thumbAlt: 'بروجيكتور Prumysl الشمسي', isSaqr: false },
-            '300w': { label: 'بروجيكتور شمسي 300 واط', contentId: 'PROJECTOR-300W', unit: PROJECTOR_300, back: '../', thumb: '../images/300W.webp', thumbAlt: 'بروجيكتور 300W', isSaqr: false },
-            '400w': { label: 'بروجيكتور شمسي 400 واط', contentId: 'PROJECTOR-400W', unit: PROJECTOR_400, back: '../', thumb: '../images/400W.webp', thumbAlt: 'بروجيكتور 400W', isSaqr: false }
+        const MODELS = {
+            '300w': { label: 'بروجيكتور شمسي 300 واط', contentId: 'PROJECTOR-300W', unit: 699, thumb: '../images/300W.webp', thumbFallback: 'https://slahmaid.github.io/ARVADIS/img/Projectors/300W.webp' },
+            '400w': { label: 'بروجيكتور شمسي 400 واط', contentId: 'PROJECTOR-400W', unit: 799, thumb: '../images/400W.webp', thumbFallback: 'https://slahmaid.github.io/ARVADIS/img/Projectors/400W.webp' }
         };
 
         function getParams() {
@@ -312,55 +302,37 @@
             return num.toLocaleString('ar-MA') + ' درهم';
         }
 
-        function resolveProduct(raw) {
-            const key = (raw || 'guard-corps').trim().toLowerCase();
-            if (PRODUCT_META[key]) return { key: key, ...PRODUCT_META[key] };
-            if (key.includes('saqr')) return { key: 'saqr', ...PRODUCT_META.saqr };
-            if (key.includes('projector') || key === '300w' || key === '400w') {
-                if (PRODUCT_META[key]) return { key: key, ...PRODUCT_META[key] };
-                return { key: 'projectors', ...PRODUCT_META.projectors };
-            }
-            if (key.includes('guard')) return { key: 'guard-corps', ...PRODUCT_META['guard-corps'] };
-            if (key.includes('moka') || key === '1_camera' || key === '2_camera') {
-                return { key: key, ...PRODUCT_META['1_camera'] };
-            }
-            return { key: key, label: raw || 'طلب Prumysl', contentId: 'PRUMYSL-ORDER', unit: SAQR_UNIT, back: '../../', thumb: '', thumbAlt: '', isSaqr: false };
+        function resolveModel(raw) {
+            const key = (raw || '300w').trim().toLowerCase();
+            return MODELS[key] ? key : '300w';
         }
 
-        function purchasePayload(meta, qty, priceOverride) {
-            let qtyNum = Math.max(1, parseInt(qty, 10) || 1);
+        function purchasePayload(modelKey, qty, priceOverride) {
+            const m = MODELS[modelKey] || MODELS['300w'];
+            const qtyNum = Math.max(1, parseInt(qty, 10) || 1);
             let value = parseInt(priceOverride, 10);
             if (!value || Number.isNaN(value)) {
-                if (meta.key === '2_camera') {
-                    value = (meta.unit || GUARD_CORPS_UNIT) * 2;
-                    qtyNum = 2;
-                } else if (meta.isSaqr) {
-                    value = SAQR_UNIT * qtyNum;
-                } else {
-                    value = (meta.unit || GUARD_CORPS_UNIT) * qtyNum;
-                }
+                value = m.unit * qtyNum;
             }
             return {
-                contentId: meta.contentId,
-                contentName: meta.label,
+                contentId: m.contentId,
+                contentName: m.label,
                 value: value,
                 numItems: qtyNum,
-                currency: 'MAD'
+                currency: 'MAD',
+                model: modelKey
             };
         }
 
         function initThankYou() {
             const p = getParams();
             const name = (p.get('name') || '').trim();
-            const productRaw = p.get('product') || 'guard-corps';
-            const modelRaw = (p.get('model') || '').trim().toLowerCase();
-            let meta = resolveProduct(modelRaw && PRODUCT_META[modelRaw] ? modelRaw : productRaw);
-            if (modelRaw && (modelRaw === '300w' || modelRaw === '400w')) {
-                meta = { key: modelRaw, ...PRODUCT_META[modelRaw] };
-            }
-            const qty = p.get('quantity') || (meta.key === '2_camera' ? '2' : '1');
+            const modelKey = resolveModel(p.get('model') || '300w');
+            const m = MODELS[modelKey];
+            const qty = p.get('quantity') || '1';
             const priceParam = p.get('price') || '';
-            const pp = purchasePayload(meta, qty, priceParam);
+            const pp = purchasePayload(modelKey, qty, priceParam);
+            const qtyNum = pp.numItems;
 
             if (name) {
                 document.getElementById('thankTitle').textContent = 'شكراً لك يا ' + name.split(' ')[0] + '!';
@@ -368,51 +340,29 @@
                 document.getElementById('summaryNameRow').hidden = false;
             }
 
-            document.getElementById('summaryProduct').textContent = meta.label;
-            const qtyNum = pp.numItems;
-            const qtyUnit = (meta.key === 'projectors' || meta.key === 'projector' || meta.key === '300w' || meta.key === '400w')
-                ? (qtyNum === 1 ? ' بروجيكتور' : ' بروجيكتورات')
-                : (qtyNum === 1 ? ' كاميرا' : ' كاميرات');
-            document.getElementById('summaryQty').textContent = qtyNum + qtyUnit;
+            document.getElementById('summaryProduct').textContent = m.label;
+            document.getElementById('summaryQty').textContent = qtyNum + (qtyNum === 1 ? ' بروجيكتور' : ' بروجيكتورات');
             document.getElementById('summaryPrice').textContent = formatPrice(pp.value);
 
-            const backLink = document.getElementById('backLink');
-            backLink.href = meta.back;
-            if (meta.isSaqr) {
-                backLink.textContent = 'العودة لصفحة الصقر';
-            } else if (meta.key === 'projectors' || meta.key === 'projector' || meta.key === '300w' || meta.key === '400w') {
-                backLink.textContent = 'العودة لصفحة البروجيكتورات';
-            } else if (meta.key === 'guard-corps' || meta.key === '1_camera' || meta.key === '2_camera') {
-                backLink.textContent = 'العودة لصفحة Guard Corps';
-            } else {
-                backLink.textContent = 'العودة لصفحة المنتج';
-            }
-
-            const thumb = document.getElementById('productThumb');
             const thumbImg = document.getElementById('productThumbImg');
-            if (meta.thumb && thumbImg) {
-                thumbImg.src = meta.thumb;
-                thumbImg.alt = meta.thumbAlt;
-            } else if (thumb) {
-                thumb.style.display = 'none';
-            }
-
-            if (meta.isSaqr) {
-                const gift = document.createElement('li');
-                gift.textContent = '🎁 بطاقة SD هدية مع كاميرا الصقر';
-                document.getElementById('stepsList').appendChild(gift);
-            }
+            thumbImg.src = m.thumb;
+            thumbImg.alt = m.label;
+            thumbImg.onerror = function () {
+                this.onerror = null;
+                this.src = m.thumbFallback;
+            };
 
             const waText = encodeURIComponent(
-                'سلام، أكدت طلبي دابا — ' + meta.label +
+                'سلام، أكدت طلب البروجيكتور دابا — ' + m.label +
                 (name ? ' (الاسم: ' + name + ')' : '') +
-                ' — الكمية: ' + qtyNum
+                ' — الكمية: ' + qtyNum +
+                ' — المجموع: ' + pp.value + ' درهم'
             );
             document.getElementById('waLink').href =
                 'https://api.whatsapp.com/send?phone=212723496854&text=' + waText;
 
             if (typeof prumyslFireThankYouConversion === 'function') {
-                prumyslFireThankYouConversion({ meta: meta, pp: pp });
+                prumyslFireThankYouConversion({ source: 'Projector2.0', pp: pp });
             }
         }
 

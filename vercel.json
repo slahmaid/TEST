@@ -3,9 +3,6 @@
   "cleanUrls": true,
   "redirects": [
     { "source": "/index.html", "destination": "/", "permanent": true },
-    { "source": "/:path+/index.html", "destination": "/:path+/", "permanent": true },
-    { "source": "/guard-corps", "destination": "/", "permanent": false },
-    { "source": "/guard-corps/", "destination": "/", "permanent": false },
-    { "source": "/guard-corps/:path*", "destination": "/", "permanent": false }
+    { "source": "/:path+/index.html", "destination": "/:path+/", "permanent": true }
   ]
 }
