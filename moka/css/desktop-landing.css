@@ -3,66 +3,127 @@
     .moka-page,
     .saqr-page,
     .projectors-page,
-    .moka-pro-max-page {
-        --desktop-max: 1240px;
+    .projector2-page,
+    .moka-pro-max-page,
+    .guard-corps-page {
+        --desktop-max: 1280px;
+        --desktop-accent: #202895;
+        --desktop-radius: 20px;
+        --desktop-shadow: 0 24px 56px rgba(32, 40, 149, 0.1);
+        --section-pad: 80px;
     }
 
+    /* ── Shell & header ── */
     .moka-page .container,
     .saqr-page .container,
     .projectors-page .container,
+    .projector2-page .container,
     .moka-pro-max-page .container,
+    .guard-corps-page .container,
     .moka-page .header-inner,
     .saqr-page .header-inner,
     .projectors-page .header-inner,
+    .projector2-page .header-inner,
     .moka-pro-max-page .header-inner,
+    .guard-corps-page .header-inner,
     .moka-page .contact-quick-inner,
     .saqr-page .contact-quick-inner,
     .projectors-page .contact-quick-inner,
-    .moka-pro-max-page .contact-quick-inner {
+    .projector2-page .contact-quick-inner,
+    .moka-pro-max-page .contact-quick-inner,
+    .guard-corps-page .contact-quick-inner {
         max-width: var(--desktop-max);
     }
 
     .moka-page .container,
     .saqr-page .container,
     .projectors-page .container,
-    .moka-pro-max-page .container {
-        padding: 0 24px;
+    .projector2-page .container,
+    .moka-pro-max-page .container,
+    .guard-corps-page .container {
+        padding: 0 32px;
+    }
+
+    .moka-page header,
+    .saqr-page header,
+    .projectors-page header,
+    .projector2-page header,
+    .moka-pro-max-page header,
+    .guard-corps-page header {
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        backdrop-filter: blur(12px);
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 1px 0 rgba(32, 40, 149, 0.06);
     }
 
     .moka-page .top-bar,
     .saqr-page .top-bar,
     .projectors-page .top-bar,
-    .moka-pro-max-page .top-bar {
+    .projector2-page .top-bar,
+    .moka-pro-max-page .top-bar,
+    .guard-corps-page .top-bar {
         font-size: 1rem;
-        padding: 12px 16px;
+        padding: 12px 24px;
+        letter-spacing: 0.01em;
+    }
+
+    .moka-page .contact-quick-row,
+    .saqr-page .contact-quick-row,
+    .projectors-page .contact-quick-row,
+    .projector2-page .contact-quick-row,
+    .moka-pro-max-page .contact-quick-row,
+    .guard-corps-page .contact-quick-row {
+        padding: 14px 32px;
+        background: linear-gradient(180deg, #fff 0%, #fafbff 100%);
+        border-bottom: 1px solid rgba(32, 40, 149, 0.06);
     }
 
     .moka-page .contact-quick-inner,
     .saqr-page .contact-quick-inner,
     .projectors-page .contact-quick-inner,
-    .moka-pro-max-page .contact-quick-inner {
-        max-width: 720px;
-        gap: 14px;
+    .projector2-page .contact-quick-inner,
+    .moka-pro-max-page .contact-quick-inner,
+    .guard-corps-page .contact-quick-inner {
+        max-width: 560px;
+        gap: 16px;
     }
 
     .moka-page .contact-quick-btn,
     .saqr-page .contact-quick-btn,
     .projectors-page .contact-quick-btn,
-    .moka-pro-max-page .contact-quick-btn {
+    .projector2-page .contact-quick-btn,
+    .moka-pro-max-page .contact-quick-btn,
+    .guard-corps-page .contact-quick-btn {
         font-size: 1rem;
-        padding: 14px 20px;
+        padding: 14px 24px;
         border-radius: 14px;
+        transition: transform 0.15s ease, filter 0.15s ease;
     }
 
+    .moka-page .contact-quick-btn:hover,
+    .saqr-page .contact-quick-btn:hover,
+    .projectors-page .contact-quick-btn:hover,
+    .projector2-page .contact-quick-btn:hover,
+    .moka-pro-max-page .contact-quick-btn:hover,
+    .guard-corps-page .contact-quick-btn:hover {
+        transform: translateY(-1px);
+        filter: brightness(1.04);
+    }
+
+    /* ── Hero + order fold ── */
     .desktop-fold {
         display: grid;
-        grid-template-columns: minmax(0, 1.1fr) minmax(400px, 0.9fr);
-        gap: 48px;
+        grid-template-columns: minmax(0, 1.15fr) minmax(420px, 0.85fr);
+        gap: 56px;
         align-items: start;
         max-width: var(--desktop-max);
         margin: 0 auto;
-        padding: 40px 24px 56px;
-        background: linear-gradient(165deg, #f6f7fc 0%, #f8f9fa 55%, #fff 100%);
+        padding: 48px 32px 64px;
+        background:
+            radial-gradient(ellipse 80% 60% at 20% 0%, rgba(32, 40, 149, 0.06) 0%, transparent 55%),
+            linear-gradient(165deg, #f4f5fc 0%, #f8f9fa 45%, #fff 100%);
     }
 
     .desktop-fold .hero-section {
@@ -70,11 +131,23 @@
         text-align: center;
     }
 
+    .desktop-fold .hero-section a {
+        display: block;
+        border-radius: var(--desktop-radius);
+        overflow: hidden;
+        transition: transform 0.35s ease, box-shadow 0.35s ease;
+    }
+
+    .desktop-fold .hero-section a:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 32px 64px rgba(32, 40, 149, 0.18);
+    }
+
     .desktop-fold .hero-section img,
     .desktop-fold .hero-section picture img {
         max-width: 100%;
-        border-radius: 24px;
-        box-shadow: 0 28px 60px rgba(32, 40, 149, 0.16);
+        border-radius: var(--desktop-radius);
+        box-shadow: var(--desktop-shadow);
     }
 
     .desktop-fold .order-section {
@@ -89,17 +162,19 @@
 
     .desktop-fold .order-title {
         text-align: right;
-        font-size: 2.05rem;
-        margin-bottom: 14px;
+        font-size: 2.15rem;
+        margin-bottom: 16px;
+        line-height: 1.25;
     }
 
     .desktop-fold .order-title .seo-h1-product,
     .desktop-fold .order-title.seo-main-heading .seo-h1-product {
         max-width: none;
-        margin: 0 0 16px 0;
+        margin: 0 0 18px 0;
         text-align: right;
-        font-size: 1.08rem;
-        line-height: 1.65;
+        font-size: 1.1rem;
+        line-height: 1.7;
+        color: #333;
     }
 
     .desktop-fold .order-title .seo-h1-cta,
@@ -109,52 +184,68 @@
 
     .desktop-fold .order-subtitle {
         text-align: right;
-        font-size: 1.08rem;
-        line-height: 1.75;
-        margin-bottom: 22px;
+        font-size: 1.1rem;
+        line-height: 1.8;
+        margin-bottom: 24px;
+        color: #444;
     }
 
     .desktop-fold .price-row {
         text-align: right;
-        margin-bottom: 18px;
+        margin-bottom: 20px;
+    }
+
+    .desktop-fold .price-highlight {
+        font-size: 2.65rem;
     }
 
     .desktop-fold .urgency-box {
         text-align: right;
-        padding: 18px 20px;
+        padding: 20px 22px;
+        border-radius: 14px;
     }
 
     .desktop-fold .form-intro,
     .desktop-fold .gift-badge {
         text-align: right;
+        font-size: 1rem;
     }
 
     .desktop-fold .order-form {
         position: sticky;
-        top: 96px;
-        padding: 32px 28px;
+        top: 88px;
+        padding: 36px 32px;
+        border-radius: var(--desktop-radius);
         border: 1px solid rgba(32, 40, 149, 0.1);
-        box-shadow: 0 20px 48px rgba(32, 40, 149, 0.1);
+        background: rgba(255, 255, 255, 0.97);
+        backdrop-filter: blur(8px);
+        box-shadow: var(--desktop-shadow);
+    }
+
+    .desktop-fold .order-form .submit-btn {
+        font-size: 1.05rem;
+        padding: 16px 20px;
     }
 
     .desktop-fold .inline-trust {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
-        margin-top: 20px;
+        gap: 12px;
+        margin-top: 22px;
         text-align: center;
     }
 
     .desktop-form-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 14px;
+        gap: 16px;
     }
 
     .desktop-form-row .form-group {
         margin-bottom: 0;
     }
 
+    /* ── Content sections ── */
     .moka-page .features-section,
     .moka-page .reviews-section,
     .moka-page .gallery-section,
@@ -168,119 +259,338 @@
     .projectors-page .gallery-section,
     .projectors-page .faq-section,
     .projectors-page .specs-section,
+    .projector2-page .features-section,
+    .projector2-page .gallery-section,
+    .projector2-page .faq-section,
+    .projector2-page .specs-section,
+    .moka-pro-max-page .specs-section,
     .moka-pro-max-page .features-section,
     .moka-pro-max-page .reviews-section,
     .moka-pro-max-page .gallery-section,
-    .moka-pro-max-page .faq-section {
-        padding: 72px 0;
+    .moka-pro-max-page .faq-section,
+    .guard-corps-page .features-section,
+    .guard-corps-page .reviews-section,
+    .guard-corps-page .gallery-section,
+    .guard-corps-page .faq-section,
+    .guard-corps-page .specs-section {
+        padding: var(--section-pad) 0;
+    }
+
+    .moka-page .specs-section,
+    .saqr-page .specs-section,
+    .projectors-page .specs-section,
+    .projector2-page .specs-section,
+    .moka-pro-max-page .specs-section,
+    .guard-corps-page .specs-section {
+        background: linear-gradient(180deg, #f8f9fc 0%, #fff 100%);
+    }
+
+    .moka-page .reviews-section,
+    .saqr-page .reviews-section,
+    .moka-pro-max-page .reviews-section,
+    .guard-corps-page .reviews-section {
+        background: #fafbff;
+    }
+
+    .moka-page .section-divider,
+    .saqr-page .section-divider,
+    .projectors-page .section-divider,
+    .projector2-page .section-divider,
+    .moka-pro-max-page .section-divider,
+    .guard-corps-page .section-divider {
+        margin-bottom: 44px;
     }
 
     .moka-page .section-divider h2,
     .saqr-page .section-divider h2,
     .projectors-page .section-divider h2,
-    .moka-pro-max-page .section-divider h2 {
-        font-size: 2.1rem;
+    .projector2-page .section-divider h2,
+    .moka-pro-max-page .section-divider h2,
+    .guard-corps-page .section-divider h2 {
+        font-size: 2.25rem;
+        letter-spacing: -0.02em;
+    }
+
+    .moka-page .section-lead,
+    .saqr-page .section-lead,
+    .projectors-page .section-lead,
+    .projector2-page .section-lead,
+    .moka-pro-max-page .section-lead,
+    .guard-corps-page .section-lead {
+        font-size: 1.12rem;
+        margin: -28px auto 40px;
+        max-width: 640px;
+        line-height: 1.75;
     }
 
     .moka-page .features-grid,
     .saqr-page .features-grid,
     .projectors-page .features-grid,
-    .moka-pro-max-page .features-grid {
-        gap: 36px;
+    .projector2-page .features-grid,
+    .moka-pro-max-page .features-grid,
+    .guard-corps-page .features-grid {
+        gap: 28px;
     }
 
-    .projectors-page .features-grid {
+    .projectors-page .features-grid,
+    .projector2-page .features-grid {
         grid-template-columns: repeat(4, 1fr);
+    }
+
+    .moka-page .feature-box,
+    .saqr-page .feature-box,
+    .projectors-page .feature-box,
+    .projector2-page .feature-box,
+    .moka-pro-max-page .feature-box,
+    .guard-corps-page .feature-box {
+        padding: 24px 18px 28px;
+        border-radius: 16px;
+        background: #fff;
+        border: 1px solid rgba(32, 40, 149, 0.07);
+        box-shadow: 0 8px 24px rgba(32, 40, 149, 0.05);
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .moka-page .feature-box:hover,
+    .saqr-page .feature-box:hover,
+    .projectors-page .feature-box:hover,
+    .projector2-page .feature-box:hover,
+    .moka-pro-max-page .feature-box:hover,
+    .guard-corps-page .feature-box:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 16px 40px rgba(32, 40, 149, 0.1);
     }
 
     .moka-page .feature-box h3,
     .saqr-page .feature-box h3,
     .projectors-page .feature-box h3,
-    .moka-pro-max-page .feature-box h3 {
-        font-size: 1.2rem;
+    .projector2-page .feature-box h3,
+    .moka-pro-max-page .feature-box h3,
+    .guard-corps-page .feature-box h3 {
+        font-size: 1.22rem;
     }
 
     .moka-page .feature-box p,
     .saqr-page .feature-box p,
     .projectors-page .feature-box p,
-    .moka-pro-max-page .feature-box p {
-        font-size: 0.95rem;
-        line-height: 1.65;
+    .projector2-page .feature-box p,
+    .moka-pro-max-page .feature-box p,
+    .guard-corps-page .feature-box p {
+        font-size: 0.96rem;
+        line-height: 1.7;
+    }
+
+    .moka-page .feature-img,
+    .saqr-page .feature-img,
+    .projectors-page .feature-img,
+    .projector2-page .feature-img,
+    .moka-pro-max-page .feature-img,
+    .guard-corps-page .feature-img {
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 16px;
     }
 
     .moka-page .specs-table-wrap,
     .saqr-page .specs-table-wrap,
     .projectors-page .specs-table-wrap,
-    .moka-pro-max-page .specs-table-wrap {
-        max-width: 880px;
+    .projector2-page .specs-table-wrap,
+    .moka-pro-max-page .specs-table-wrap,
+    .guard-corps-page .specs-table-wrap {
+        max-width: 920px;
         margin-left: auto;
         margin-right: auto;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 12px 32px rgba(32, 40, 149, 0.08);
+        border: 1px solid rgba(32, 40, 149, 0.08);
     }
 
     .moka-page .specs-table,
     .saqr-page .specs-table,
     .projectors-page .specs-table,
-    .moka-pro-max-page .specs-table {
-        font-size: 1rem;
+    .projector2-page .specs-table,
+    .moka-pro-max-page .specs-table,
+    .guard-corps-page .specs-table {
+        font-size: 1.02rem;
+    }
+
+    .moka-page .specs-table tbody tr:nth-child(even),
+    .saqr-page .specs-table tbody tr:nth-child(even),
+    .projectors-page .specs-table tbody tr:nth-child(even),
+    .projector2-page .specs-table tbody tr:nth-child(even),
+    .moka-pro-max-page .specs-table tbody tr:nth-child(even),
+    .guard-corps-page .specs-table tbody tr:nth-child(even) {
+        background: rgba(32, 40, 149, 0.03);
     }
 
     .moka-page .reviews-wrapper,
     .saqr-page .reviews-wrapper,
-    .moka-pro-max-page .reviews-wrapper {
+    .moka-pro-max-page .reviews-wrapper,
+    .guard-corps-page .reviews-wrapper {
         grid-template-columns: repeat(3, 1fr);
-        gap: 24px;
+        gap: 28px;
     }
 
     .moka-page .review-card,
     .saqr-page .review-card,
-    .moka-pro-max-page .review-card {
-        padding: 26px;
+    .moka-pro-max-page .review-card,
+    .guard-corps-page .review-card {
+        padding: 28px;
+        border-radius: 16px;
+        border: 1px solid rgba(32, 40, 149, 0.07);
+        box-shadow: 0 10px 28px rgba(32, 40, 149, 0.06);
+        transition: transform 0.2s ease;
     }
 
-    .saqr-page .video-grid {
+    .moka-page .review-card:hover,
+    .saqr-page .review-card:hover,
+    .moka-pro-max-page .review-card:hover,
+    .guard-corps-page .review-card:hover {
+        transform: translateY(-3px);
+    }
+
+    .saqr-page .video-grid,
+    .moka-pro-max-page .video-grid,
+    .guard-corps-page .video-grid {
         grid-template-columns: repeat(2, 1fr);
-        gap: 28px;
+        gap: 32px;
+        max-width: 960px;
+        margin: 0 auto;
+    }
+
+    .projectors-page .short-video-wrap,
+    .projector2-page .short-video-wrap {
+        max-width: 480px;
+        margin: 0 auto;
+    }
+
+    .projectors-page .short-video-embed,
+    .projector2-page .short-video-embed,
+    .saqr-page .short-video-embed,
+    .moka-pro-max-page .short-video-embed,
+    .guard-corps-page .short-video-embed {
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: var(--desktop-shadow);
     }
 
     .moka-page .gallery-grid,
     .saqr-page .gallery-grid,
-    .moka-pro-max-page .gallery-grid {
+    .moka-pro-max-page .gallery-grid,
+    .guard-corps-page .gallery-grid {
         gap: 24px;
     }
 
     .moka-page .gallery-item,
     .saqr-page .gallery-item,
-    .moka-pro-max-page .gallery-item {
-        border-radius: 18px;
+    .moka-pro-max-page .gallery-item,
+    .guard-corps-page .gallery-item {
+        border-radius: 16px;
+        overflow: hidden;
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .moka-page .gallery-item:hover,
+    .saqr-page .gallery-item:hover,
+    .moka-pro-max-page .gallery-item:hover,
+    .guard-corps-page .gallery-item:hover {
+        transform: scale(1.02);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+    }
+
+    .moka-page .features-cta-wrap,
+    .saqr-page .features-cta-wrap,
+    .projectors-page .features-cta-wrap,
+    .projector2-page .features-cta-wrap,
+    .moka-pro-max-page .features-cta-wrap,
+    .guard-corps-page .features-cta-wrap {
+        margin-top: 36px;
+    }
+
+    .moka-page .features-cta-btn,
+    .saqr-page .features-cta-btn,
+    .projectors-page .features-cta-btn,
+    .projector2-page .features-cta-btn,
+    .moka-pro-max-page .features-cta-btn,
+    .guard-corps-page .features-cta-btn {
+        max-width: 420px;
+        font-size: 1.05rem;
+        padding: 16px 28px;
+    }
+
+    .moka-page .faq-section,
+    .saqr-page .faq-section,
+    .projectors-page .faq-section,
+    .projector2-page .faq-section,
+    .moka-pro-max-page .faq-section,
+    .guard-corps-page .faq-section {
+        background: linear-gradient(180deg, #fff 0%, #f6f7fc 100%);
     }
 
     .moka-page .faq-section .container,
     .saqr-page .faq-section .container,
     .projectors-page .faq-section .container,
-    .moka-pro-max-page .faq-section .container {
-        max-width: 920px;
+    .projector2-page .faq-section .container,
+    .moka-pro-max-page .faq-section .container,
+    .guard-corps-page .faq-section .container {
+        max-width: 960px;
+    }
+
+    .moka-page .faq-item,
+    .saqr-page .faq-item,
+    .projectors-page .faq-item,
+    .projector2-page .faq-item,
+    .moka-pro-max-page .faq-item,
+    .guard-corps-page .faq-item {
+        border-radius: 14px;
+        overflow: hidden;
+        margin-bottom: 12px;
+        border: 1px solid rgba(32, 40, 149, 0.08);
+        box-shadow: 0 4px 12px rgba(32, 40, 149, 0.04);
     }
 
     .moka-page .faq-question,
     .saqr-page .faq-question,
     .projectors-page .faq-question,
-    .moka-pro-max-page .faq-question {
-        font-size: 1.12rem;
+    .projector2-page .faq-question,
+    .moka-pro-max-page .faq-question,
+    .guard-corps-page .faq-question {
+        font-size: 1.14rem;
         padding: 22px 28px;
     }
 
+    .moka-page .faq-answer,
+    .saqr-page .faq-answer,
+    .projectors-page .faq-answer,
+    .projector2-page .faq-answer,
+    .moka-pro-max-page .faq-answer,
+    .guard-corps-page .faq-answer {
+        padding: 0 28px 22px;
+        font-size: 1rem;
+        line-height: 1.75;
+    }
+
+    /* ── Retarget CTA band ── */
     .moka-page .retarget-section,
     .saqr-page .retarget-section,
     .projectors-page .retarget-section,
-    .moka-pro-max-page .retarget-section {
-        padding: 72px 0;
+    .projector2-page .retarget-section,
+    .moka-pro-max-page .retarget-section,
+    .guard-corps-page .retarget-section {
+        padding: var(--section-pad) 32px;
+        background:
+            radial-gradient(ellipse 70% 80% at 50% 100%, rgba(32, 40, 149, 0.08) 0%, transparent 60%),
+            linear-gradient(180deg, #eef0fa 0%, #f4f5fc 100%);
     }
 
     .moka-page .retarget-section .container,
     .saqr-page .retarget-section .container,
     .projectors-page .retarget-section .container,
-    .moka-pro-max-page .retarget-section .container {
-        max-width: 560px;
+    .projector2-page .retarget-section .container,
+    .moka-pro-max-page .retarget-section .container,
+    .guard-corps-page .retarget-section .container {
+        max-width: 580px;
     }
 
     .moka-page .retarget-section .order-title,
@@ -289,51 +599,106 @@
     .saqr-page .retarget-section .order-subtitle,
     .projectors-page .retarget-section .order-title,
     .projectors-page .retarget-section .order-subtitle,
+    .projector2-page .retarget-section .order-title,
+    .projector2-page .retarget-section .order-subtitle,
     .moka-pro-max-page .retarget-section .order-title,
-    .moka-pro-max-page .retarget-section .order-subtitle {
+    .moka-pro-max-page .retarget-section .order-subtitle,
+    .guard-corps-page .retarget-section .order-title,
+    .guard-corps-page .retarget-section .order-subtitle {
         text-align: right;
     }
 
     .moka-page .retarget-section .order-form,
     .saqr-page .retarget-section .order-form,
     .projectors-page .retarget-section .order-form,
-    .moka-pro-max-page .retarget-section .order-form {
-        padding: 32px 28px;
+    .projector2-page .retarget-section .order-form,
+    .moka-pro-max-page .retarget-section .order-form,
+    .guard-corps-page .retarget-section .order-form {
+        padding: 36px 32px;
+        border-radius: var(--desktop-radius);
+        box-shadow: var(--desktop-shadow);
     }
 
     .moka-page .trust-badges,
     .saqr-page .trust-badges,
     .projectors-page .trust-badges,
-    .moka-pro-max-page .trust-badges {
-        max-width: 920px;
-        gap: 28px;
+    .projector2-page .trust-badges,
+    .moka-pro-max-page .trust-badges,
+    .guard-corps-page .trust-badges {
+        max-width: 960px;
+        gap: 32px;
+        grid-template-columns: repeat(4, 1fr);
     }
 
     .moka-page .badge-item,
     .saqr-page .badge-item,
     .projectors-page .badge-item,
-    .moka-pro-max-page .badge-item {
+    .projector2-page .badge-item,
+    .moka-pro-max-page .badge-item,
+    .guard-corps-page .badge-item {
         font-size: 1rem;
+        padding: 8px 4px;
     }
 
     .moka-page .badge-icon,
     .saqr-page .badge-icon,
     .projectors-page .badge-icon,
-    .moka-pro-max-page .badge-icon {
-        font-size: 2.4rem;
+    .projector2-page .badge-icon,
+    .moka-pro-max-page .badge-icon,
+    .guard-corps-page .badge-icon {
+        font-size: 2.5rem;
     }
 
     .moka-page .mobile-cta,
     .saqr-page .mobile-cta,
     .projectors-page .mobile-cta,
-    .moka-pro-max-page .mobile-cta {
+    .projector2-page .mobile-cta,
+    .moka-pro-max-page .mobile-cta,
+    .guard-corps-page .mobile-cta {
         display: none !important;
     }
 
     .moka-page .whatsapp-float,
     .saqr-page .whatsapp-float,
     .projectors-page .whatsapp-float,
-    .moka-pro-max-page .whatsapp-float {
-        bottom: 24px;
+    .projector2-page .whatsapp-float,
+    .moka-pro-max-page .whatsapp-float,
+    .guard-corps-page .whatsapp-float {
+        bottom: 28px;
+        left: 28px;
+        width: 60px;
+        height: 60px;
+    }
+}
+
+/* Wide desktop refinements (≥1280px) */
+@media (min-width: 1280px) {
+    .moka-page,
+    .saqr-page,
+    .projectors-page,
+    .projector2-page,
+    .moka-pro-max-page,
+    .guard-corps-page {
+        --desktop-max: 1320px;
+        --section-pad: 96px;
+    }
+
+    .desktop-fold {
+        grid-template-columns: minmax(0, 1.2fr) minmax(440px, 0.8fr);
+        gap: 64px;
+        padding: 56px 40px 72px;
+    }
+
+    .desktop-fold .order-title {
+        font-size: 2.35rem;
+    }
+
+    .moka-page .section-divider h2,
+    .saqr-page .section-divider h2,
+    .projectors-page .section-divider h2,
+    .projector2-page .section-divider h2,
+    .moka-pro-max-page .section-divider h2,
+    .guard-corps-page .section-divider h2 {
+        font-size: 2.4rem;
     }
 }
