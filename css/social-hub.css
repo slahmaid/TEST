@@ -1,0 +1,218 @@
+/* Prumysl — social hub / link page */
+.social-hub-page {
+    font-family: 'Cairo', sans-serif;
+    background: linear-gradient(180deg, #f4f5ff 0%, var(--prumysl-bg, #f8f9fa) 220px);
+    color: var(--prumysl-text, #111);
+    line-height: 1.55;
+    min-height: 100vh;
+}
+
+.social-hub-page img[loading="lazy"] {
+    opacity: 1;
+}
+
+.social-hub-header {
+    background: rgba(255, 255, 255, 0.92);
+    border-bottom: 1px solid #eee;
+    padding: 14px 0;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    backdrop-filter: blur(10px);
+}
+
+.social-hub-header__inner {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 0 16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.social-hub-header__logo {
+    max-width: 132px;
+}
+
+.social-hub-header__logo img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.social-hub-fax {
+    background: var(--prumysl-blue, #202895);
+    text-align: center;
+    padding: 11px 16px;
+}
+
+.social-hub-fax a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-weight: 800;
+    font-size: clamp(0.9rem, 3.2vw, 1rem);
+    color: #fff;
+    text-decoration: none;
+    letter-spacing: 0.02em;
+}
+
+.social-hub-fax a:hover {
+    color: #e8eaff;
+}
+
+.social-hub-fax__icon {
+    font-size: 1.05rem;
+    line-height: 1;
+    opacity: 0.9;
+}
+
+.social-hub-main {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 24px 16px 36px;
+}
+
+.social-hub-intro {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.social-hub-intro h1 {
+    font-size: clamp(1.15rem, 3.8vw, 1.35rem);
+    font-weight: 900;
+    margin-bottom: 4px;
+    color: var(--prumysl-blue, #202895);
+}
+
+.social-hub-intro p {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--prumysl-text-muted, #555);
+}
+
+.social-hub-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.social-block {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-radius: 18px;
+    overflow: hidden;
+    border: 1px solid #e6e8f2;
+    box-shadow: 0 6px 20px rgba(32, 40, 149, 0.06);
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.social-block:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px rgba(32, 40, 149, 0.11);
+}
+
+.social-block:active {
+    transform: translateY(0);
+}
+
+.social-block--full {
+    grid-column: 1 / -1;
+}
+
+.social-block__media {
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    background: var(--prumysl-soft, #f4f5ff);
+}
+
+.social-block__media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.35s ease;
+}
+
+.social-block:hover .social-block__media img {
+    transform: scale(1.04);
+}
+
+.social-block__label {
+    padding: 10px 8px 12px;
+    font-weight: 900;
+    font-size: clamp(0.76rem, 2.6vw, 0.88rem);
+    text-align: center;
+    color: #fff;
+    line-height: 1.3;
+}
+
+.social-block--full .social-block__label {
+    font-size: clamp(0.88rem, 2.8vw, 0.98rem);
+    padding: 12px 14px 14px;
+}
+
+.social-block[data-platform="homepage"] .social-block__label {
+    background: var(--prumysl-blue, #202895);
+}
+
+.social-block[data-platform="facebook"] .social-block__label {
+    background: #1877f2;
+}
+
+.social-block[data-platform="instagram"] .social-block__label {
+    background: linear-gradient(135deg, #f58529, #dd2a7b, #8134af);
+}
+
+.social-block[data-platform="tiktok"] .social-block__label {
+    background: #010101;
+}
+
+.social-block[data-platform="youtube"] .social-block__label {
+    background: #ff0000;
+}
+
+.social-block[data-platform="whatsapp"] .social-block__label {
+    background: #25d366;
+}
+
+.social-block[data-platform="localisation"] .social-block__label {
+    background: #34a853;
+}
+
+.social-hub-footer {
+    text-align: center;
+    padding: 8px 16px 28px;
+    color: var(--prumysl-text-muted, #555);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+@media (min-width: 768px) {
+    .social-hub-main {
+        padding-top: 32px;
+    }
+
+    .social-hub-grid {
+        gap: 16px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .social-block,
+    .social-block__media img {
+        transition: none;
+    }
+
+    .social-block:hover {
+        transform: none;
+    }
+
+    .social-block:hover .social-block__media img {
+        transform: none;
+    }
+}

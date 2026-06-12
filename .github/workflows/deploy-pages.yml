@@ -1,0 +1,103 @@
+# Deploy static site to GitHub Pages with Firebase config from repository secrets.
+name: Deploy Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Use github-pages environment so secrets stored there are visible (same as deploy job).
+    environment: github-pages
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write Firebase config for production
+        env:
+          FIREBASE_CONFIG_JS: ${{ secrets.FIREBASE_CONFIG_JS }}
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
+        run: |
+          set -e
+          write_config() {
+            for d in moka moka-pro-max saqr projectors; do
+              mkdir -p "$d/js"
+              cp js/firebase-config.js "$d/js/firebase-config.js"
+            done
+            echo "Wrote firebase-config.js to js/ and all product folders"
+          }
+
+          if [ -n "$FIREBASE_CONFIG_JS" ]; then
+            printf '%s\n' "$FIREBASE_CONFIG_JS" > js/firebase-config.js
+            write_config
+            exit 0
+          fi
+
+          if [ -n "$FIREBASE_API_KEY" ] && [ -n "$FIREBASE_APP_ID" ] && [ -n "$FIREBASE_MESSAGING_SENDER_ID" ]; then
+            node scripts/write-firebase-config.mjs
+            exit 0
+          fi
+
+          echo "::error::No Firebase secrets found."
+          echo ""
+          echo "Add ONE of these in GitHub (Repository OR Environment github-pages secrets):"
+          echo ""
+          echo "  Option A (easiest): secret name FIREBASE_CONFIG_JS"
+          echo "    Value = entire contents of your local js/firebase-config.js file"
+          echo ""
+          echo "  Option B: four secrets"
+          echo "    FIREBASE_API_KEY, FIREBASE_APP_ID, FIREBASE_MESSAGING_SENDER_ID"
+          echo "    optional: FIREBASE_MEASUREMENT_ID"
+          echo ""
+          echo "Settings → Secrets and variables → Actions"
+          echo "  → Repository secrets  OR  Environments → github-pages"
+          exit 1
+
+      - name: Write admin config for production
+        env:
+          ADMIN_CONFIG_JS: ${{ secrets.ADMIN_CONFIG_JS }}
+        run: |
+          if [ -n "$ADMIN_CONFIG_JS" ]; then
+            printf '%s\n' "$ADMIN_CONFIG_JS" > js/admin-config.js
+          else
+            cp js/admin-config.example.js js/admin-config.js
+          fi
+          echo "Wrote js/admin-config.js"
+
+      - name: Prepare site artifact
+        run: |
+          mkdir -p _site
+          shopt -s dotglob
+          for item in *; do
+            case "$item" in
+              .git|.github|_site|node_modules) ;;
+              *) cp -r "$item" _site/ ;;
+            esac
+          done
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
