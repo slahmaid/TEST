@@ -1,0 +1,10 @@
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+.env
+.env.*
+**/firebase-config.js
+!**/firebase-config.example.js
+**/admin-config.js
+!**/admin-config.example.js
