@@ -245,6 +245,12 @@
     line-height: 1.55;
 }
 
+.dalil-platforms {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
 /* --- Top grid cards --- */
 .dalil-grid {
     display: grid;
@@ -261,6 +267,11 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+    transition: transform 0.25s ease;
+}
+
+.dalil-card:hover {
+    transform: translateY(-2px);
 }
 
 .dalil-card__glow {
@@ -297,6 +308,14 @@
     box-shadow:
         0 8px 32px rgba(32, 40, 100, 0.1),
         inset 0 1px 0 rgba(255, 255, 255, 0.85),
+        inset 0 -2px 8px rgba(0, 0, 0, 0.03);
+    transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.dalil-card:hover .dalil-card__body {
+    box-shadow:
+        0 16px 48px rgba(32, 40, 100, 0.14),
+        inset 0 1px 0 rgba(255, 255, 255, 0.9),
         inset 0 -2px 8px rgba(0, 0, 0, 0.03);
 }
 
@@ -415,6 +434,11 @@
         -4px -4px 14px rgba(255, 255, 255, 0.9),
         inset 0 1px 0 rgba(255, 255, 255, 0.85);
     overflow: hidden;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.dalil-row:hover {
+    transform: translateY(-2px);
 }
 
 .dalil-row__glow {
@@ -571,15 +595,226 @@
 @media (min-width: 768px) {
     .dalil-main {
         padding-top: 32px;
+        padding-bottom: 48px;
     }
 
     .dalil-grid {
         gap: 16px;
     }
 
+    .dalil-platforms {
+        gap: 22px;
+    }
+
     .dalil-page .header-inner,
     .dalil-page .site-visit-inner {
         max-width: 1280px;
+    }
+
+    .dalil-page .site-visit-inner {
+        display: flex;
+        justify-content: center;
+    }
+
+    .dalil-page .site-visit-btn {
+        max-width: 420px;
+    }
+
+    .dalil-bg__orb--1 {
+        width: 420px;
+        height: 420px;
+    }
+
+    .dalil-bg__orb--2 {
+        width: 360px;
+        height: 360px;
+    }
+
+    .dalil-bg__orb--3 {
+        width: 280px;
+        height: 280px;
+    }
+}
+
+@media (min-width: 1024px) {
+    .dalil-main {
+        max-width: 1080px;
+        padding: 52px 40px 72px;
+    }
+
+    .dalil-intro {
+        margin-bottom: 44px;
+    }
+
+    .dalil-intro h1 {
+        font-size: 2.15rem;
+        margin-bottom: 14px;
+        letter-spacing: -0.02em;
+    }
+
+    .dalil-intro p {
+        font-size: 1.05rem;
+        max-width: 680px;
+        margin-inline: auto;
+        line-height: 1.65;
+    }
+
+    .dalil-platforms {
+        gap: 28px;
+        padding: 32px;
+        border-radius: 28px;
+        background: rgba(255, 255, 255, 0.35);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 255, 255, 0.65);
+        box-shadow:
+            0 20px 60px rgba(32, 40, 100, 0.08),
+            inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    }
+
+    .dalil-grid {
+        gap: 24px;
+        margin-bottom: 0;
+    }
+
+    .dalil-card {
+        border-radius: 24px;
+    }
+
+    .dalil-card__body {
+        padding: 32px 24px 24px;
+        border-radius: 24px;
+    }
+
+    .dalil-card__icon {
+        width: 58px;
+        height: 58px;
+        border-radius: 16px;
+        margin-bottom: 16px;
+    }
+
+    .dalil-card__icon svg {
+        width: 28px;
+        height: 28px;
+    }
+
+    .dalil-card__name {
+        font-size: 1.25rem;
+        margin-bottom: 10px;
+    }
+
+    .dalil-card__desc {
+        font-size: 0.92rem;
+        min-height: 4.2em;
+        margin-bottom: 20px;
+    }
+
+    .dalil-card__btn {
+        font-size: 0.95rem;
+        min-height: 48px;
+        padding: 12px 24px;
+        border-radius: 14px;
+    }
+
+    .dalil-card__btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .dalil-list {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+    }
+
+    .dalil-row {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 28px 22px 24px;
+        gap: 14px;
+        border-radius: 24px;
+    }
+
+    .dalil-row__icon {
+        order: 1;
+        width: 54px;
+        height: 54px;
+        border-radius: 14px;
+    }
+
+    .dalil-row__icon svg {
+        width: 26px;
+        height: 26px;
+    }
+
+    .dalil-row__content {
+        order: 2;
+        text-align: center;
+        flex: 1;
+    }
+
+    .dalil-row__title {
+        font-size: 1.1rem;
+        margin-bottom: 8px;
+    }
+
+    .dalil-row__desc {
+        font-size: 0.88rem;
+        line-height: 1.55;
+    }
+
+    .dalil-row__action {
+        order: 3;
+        max-width: none;
+        width: 100%;
+        justify-content: center;
+        padding: 12px 18px;
+        font-size: 0.88rem;
+        border-radius: 12px;
+        margin-top: auto;
+    }
+
+    .dalil-row__action svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .dalil-row__cursor {
+        display: none;
+    }
+
+    .dalil-row--hover:hover {
+        box-shadow:
+            0 16px 40px rgba(32, 40, 100, 0.12),
+            inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    }
+
+    .dalil-page .site-footer {
+        padding: 44px 24px;
+    }
+
+    .dalil-page header {
+        padding: 16px 0;
+    }
+
+    .dalil-page .logo-container {
+        max-width: 168px;
+    }
+}
+
+@media (min-width: 1280px) {
+    .dalil-main {
+        max-width: 1140px;
+        padding-inline: 48px;
+    }
+
+    .dalil-platforms {
+        padding: 36px 40px;
+    }
+
+    .dalil-list {
+        gap: 24px;
     }
 }
 
@@ -587,6 +822,17 @@
     .dalil-page .top-bar .pulse-dot,
     .dalil-row__cursor {
         animation: none;
+    }
+
+    .dalil-card,
+    .dalil-row,
+    .dalil-card__body {
+        transition: none;
+    }
+
+    .dalil-card:hover,
+    .dalil-row:hover {
+        transform: none;
     }
 
     .dalil-card__btn,
