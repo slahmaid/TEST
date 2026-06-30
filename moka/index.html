@@ -78,7 +78,7 @@
     t.src=v;s=b.getElementsByTagName(e)[0];
     s.parentNode.insertBefore(t,s)}(window, document,'script',
     'https://connect.facebook.net/en_US/fbevents.js');
-    fbq('init', '740114099139411'); // ← REPLACE WITH YOUR ID
+    fbq('init', '740114099139411');
     fbq('track', 'PageView');
     </script>
     <noscript><img height="1" width="1" style="display:none"
@@ -1181,7 +1181,7 @@
 
             <div class="features-grid">
                 <div class="feature-box">
-                    <div class="feature-img"><img src="images/2-lenses.jpg" alt="عدستان وشاشتان Dual Lens — كاميرا موكا في V380 Pro"></div>
+                    <div class="feature-img"><img src="images/2-lenses.jpg" alt="عدستان وشاشتان Dual Lens — كاميرا موكا في V380 Pro" loading="lazy" decoding="async"></div>
                     <h3>عدستان + شاشتان (Dual Lens)</h3>
                     <p>
                         عدسة ثابتة للرؤية العامة وعدسة <b>PTZ</b> تتبع الحركة حتى <b>355°</b>. في تطبيق <b>V380 Pro</b> كتشوف جوج شاشات فآن واحد باش تغطي كل الزوايا.
@@ -1189,19 +1189,19 @@
                 </div>
 
                 <div class="feature-box">
-                    <div class="feature-img"><img src="images/Solar-Panels.jpg" alt="لوحان شمسيان 18W وبطارية 8000mAh — كاميرا موكا"></div>
+                    <div class="feature-img"><img src="images/Solar-Panels.jpg" alt="لوحان شمسيان 18W وبطارية 8000mAh — كاميرا موكا" loading="lazy" decoding="async"></div>
                     <h3>طاقة 18W + بطارية 8000mAh</h3>
                     <p>لوحان شمسيان بقوة إجمالية <b>18W</b> لشحن أسرع، وبطارية <b>8000mAh</b> باش تخدم ليلاً ونهاراً حتى فالأجواء الغائمة — وكتقدر تشحنها بـ <b>USB 5V</b> ملي كتحتاج.</p>
                 </div>
 
                 <div class="feature-box">
-                    <div class="feature-img"><img src="images/motion.gif" alt="كشف PIR وكشف إنسان وتتبع — كاميرا موكا الشمسية"></div>
+                    <div class="feature-img"><img src="images/motion.gif" alt="كشف PIR وكشف إنسان وتتبع — كاميرا موكا الشمسية" loading="lazy" decoding="async"></div>
                     <h3>PIR + كشف إنسان</h3>
                     <p>حساس PIR كيستشعر حرارة الجسم البشري باش يقلّل الإنذارات الكاذبة: الكاميرا كتفيق، كتسجّل الحدث، كتبعث تنبيهاً، وترجع لوضع توفير الطاقة.</p>
                 </div>
 
                 <div class="feature-box">
-                    <div class="feature-img"><img src="images/Night-Vision.gif" alt="4G ورؤية ليلية IR-Cut ومقاومة IP66 — كاميرا موكا"></div>
+                    <div class="feature-img"><img src="images/Night-Vision.gif" alt="4G ورؤية ليلية IR-Cut ومقاومة IP66 — كاميرا موكا" loading="lazy" decoding="async"></div>
                     <h3>4G + ليل واضح + IP66</h3>
                     <p>نسخة <b>4G</b> للأماكن اللي ما كيوصلهاش الإنترنت الأرضي؛ رؤية ليلية <b>IR-Cut</b> (أبيض وأسود + ملون) حتى حوالي <b>30 متر</b>، وهيكل <b>IP66</b> ضد الماء والغبار.</p>
                 </div>
@@ -1496,6 +1496,21 @@
             return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, '0')).join('');
         }
 
+        (function () {
+            const el = document.querySelector('form.order-form input[name="product_offer"]');
+            const offer = (el && el.value) || '1_camera';
+            const numItems = offer === '2_camera' ? 2 : 1;
+            if (typeof fbq !== 'undefined') {
+                fbq('track', 'ViewContent', {
+                    content_type: 'product',
+                    content_ids: ['MOKA-4G-DUAL'],
+                    content_name: 'كاميرا موكا',
+                    currency: 'MAD',
+                    value: 599 * numItems
+                });
+            }
+        })();
+
         mokaTtqReady(function () {
             const el = document.querySelector('form.order-form input[name="product_offer"]');
             const offer = (el && el.value) || '1_camera';
@@ -1554,6 +1569,13 @@
                 const numItems = offer === '2_camera' ? 2 : 1;
                 const unitPrice = 599;
                 if (typeof fbq !== 'undefined') {
+                    fbq('track', 'AddToCart', {
+                        content_type: 'product',
+                        content_ids: ['MOKA-4G-DUAL'],
+                        currency: 'MAD',
+                        value: unitPrice * numItems,
+                        num_items: numItems
+                    });
                     fbq('track', 'InitiateCheckout', {
                         content_type: 'product',
                         content_ids: ['MOKA-4G-DUAL'],

@@ -4,10 +4,10 @@
  */
 (function (global) {
     global.PRUMYSL_ADS = global.PRUMYSL_ADS || {
-        saqrActive: false,
-        projectors2Active: false,
-        mokaActive: false,
-        mokaProMaxActive: false
+        saqrActive: true,
+        projectors2Active: true,
+        mokaActive: true,
+        mokaProMaxActive: true
     };
     global.prumyslSaqrAdsActive = function () {
         return !!(global.PRUMYSL_ADS && global.PRUMYSL_ADS.saqrActive);
