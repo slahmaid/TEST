@@ -2,6 +2,9 @@
     'use strict';
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        document.querySelectorAll('.reveal').forEach(function (el) {
+            el.classList.add('is-visible');
+        });
         return;
     }
 
@@ -15,12 +18,16 @@
         '.review-card',
         '.gallery-item',
         '.product-card',
+        '.benefit-card',
+        '.use-case-card',
+        '.step-card',
         '.trust-item',
         '.faq-item',
         '.order-form',
         '.hero-price-bar',
         '.trust-strip',
-        '.home-video-wrap'
+        '.home-video-wrap',
+        '.short-video-embed'
     ].join(',');
 
     function init() {
