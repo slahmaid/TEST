@@ -566,9 +566,21 @@
     .projector2-page .faq-answer,
     .moka-pro-max-page .faq-answer,
     .guard-corps-page .faq-answer {
-        padding: 0 28px 22px;
+        padding: 0 28px;
         font-size: 1rem;
         line-height: 1.75;
+        max-height: 0;
+        overflow: hidden;
+    }
+
+    .moka-page .faq-item.active .faq-answer,
+    .saqr-page .faq-item.active .faq-answer,
+    .projectors-page .faq-item.active .faq-answer,
+    .projector2-page .faq-item.active .faq-answer,
+    .moka-pro-max-page .faq-item.active .faq-answer,
+    .guard-corps-page .faq-item.active .faq-answer {
+        padding: 0 28px 22px;
+        max-height: 900px;
     }
 
     /* ── Retarget CTA band ── */
