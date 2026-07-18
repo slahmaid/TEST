@@ -25,6 +25,15 @@
         return PRODUCTS[key] || PRODUCTS.moka;
     }
 
+    function pixelOpts(cfg) {
+        return {
+            contentId: cfg.contentId,
+            contentName: cfg.label,
+            value: cfg.price,
+            numItems: 1
+        };
+    }
+
     function buildThankYouUrl(form, cfg, name) {
         var thankYouBase = form.getAttribute('data-thank-you') || cfg.thankYou;
         var formData = new FormData(form);
@@ -52,17 +61,43 @@
     }
 
     function fireInitiateCheckout(cfg) {
-        if (typeof fbq === 'undefined') return;
-        fbq('track', 'InitiateCheckout', {
-            content_type: 'product',
-            content_ids: [cfg.contentId],
-            currency: 'MAD',
-            value: cfg.price,
-            num_items: 1
-        });
+        var opts = pixelOpts(cfg);
+        if (typeof window.prumyslTrackInitiateCheckout === 'function') {
+            window.prumyslTrackInitiateCheckout(opts);
+            return;
+        }
+        if (typeof fbq !== 'undefined') {
+            fbq('track', 'InitiateCheckout', {
+                content_type: 'product',
+                content_ids: [cfg.contentId],
+                currency: 'MAD',
+                value: cfg.price,
+                num_items: 1
+            });
+        }
+        if (typeof ttq !== 'undefined') {
+            var fire = function () {
+                ttq.track('InitiateCheckout', {
+                    contents: [{
+                        content_id: cfg.contentId,
+                        content_type: 'product',
+                        content_name: cfg.label
+                    }],
+                    value: cfg.price,
+                    currency: 'MAD'
+                });
+            };
+            if (typeof ttq.ready === 'function') ttq.ready(fire);
+            else try { fire(); } catch (_) {}
+        }
     }
 
     function trackCheckoutIntent(form, cfg) {
+        var opts = pixelOpts(cfg);
+        if (typeof window.prumyslTrackCheckoutIntent === 'function') {
+            window.prumyslTrackCheckoutIntent(form, opts);
+            return;
+        }
         if (form.dataset.checkoutIntentTracked === '1') return;
         form.dataset.checkoutIntentTracked = '1';
         if (typeof fbq !== 'undefined') {
@@ -73,6 +108,21 @@
                 value: cfg.price,
                 num_items: 1
             });
+        }
+        if (typeof ttq !== 'undefined') {
+            var fire = function () {
+                ttq.track('AddToCart', {
+                    contents: [{
+                        content_id: cfg.contentId,
+                        content_type: 'product',
+                        content_name: cfg.label
+                    }],
+                    value: cfg.price,
+                    currency: 'MAD'
+                });
+            };
+            if (typeof ttq.ready === 'function') ttq.ready(fire);
+            else try { fire(); } catch (_) {}
         }
         fireInitiateCheckout(cfg);
     }
@@ -154,6 +204,35 @@
                             currency: 'MAD',
                             value: cfg.price
                         });
+                    }
+
+                    var opts = pixelOpts(cfg);
+                    var afterIdentify = function () {
+                        if (typeof window.prumyslTrackPlaceAnOrder === 'function') {
+                            window.prumyslTrackPlaceAnOrder(opts);
+                        } else if (typeof ttq !== 'undefined') {
+                            var fire = function () {
+                                ttq.track('PlaceAnOrder', {
+                                    contents: [{
+                                        content_id: cfg.contentId,
+                                        content_type: 'product',
+                                        content_name: cfg.label
+                                    }],
+                                    value: cfg.price,
+                                    currency: 'MAD'
+                                });
+                            };
+                            if (typeof ttq.ready === 'function') ttq.ready(fire);
+                            else try { fire(); } catch (_) {}
+                        }
+                    };
+
+                    if (typeof window.prumyslStoreTtqIdentify === 'function') {
+                        window.prumyslStoreTtqIdentify(cleanPhone, 'prumysl-' + cfg.pendingKey)
+                            .then(afterIdentify)
+                            .catch(afterIdentify);
+                    } else {
+                        afterIdentify();
                     }
                 } finally {
                     setTimeout(function () {
