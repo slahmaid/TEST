@@ -25,7 +25,7 @@
             id: 'guard-corps',
             name: 'كاميرا Guard Corps',
             desc: '3 عدسات PTZ، 15MP، 4G فقط',
-            price: '1150 درهم',
+            price: '999 درهم',
             image: 'guard-corps/images/Guardcorp.jpeg',
             href: 'guard-corps/',
             tag: '3 شاشات حية'

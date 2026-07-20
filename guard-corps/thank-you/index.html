@@ -290,16 +290,16 @@
     <script src="../js/thank-you-conversion.js"></script>
     <script>
         const SAQR_UNIT = 1999;
-        const GUARD_CORPS_UNIT = 1150;
+        const GUARD_CORPS_UNIT = 999;
         const MOKA_UNIT = 699;
         const PROJECTOR_300 = 699;
         const PROJECTOR_400 = 799;
         const PRODUCT_META = {
             saqr: { label: 'كاميرا الصقر — 4G', contentId: 'SAQR-36X-4G', unit: SAQR_UNIT, back: '../', thumb: '../images/Saqr.jpeg', thumbAlt: 'كاميرا Prumysl الصقر', isSaqr: true },
             saqr_4g: { label: 'كاميرا الصقر — 4G', contentId: 'SAQR-36X-4G', unit: SAQR_UNIT, back: '../', thumb: '../images/Saqr.jpeg', thumbAlt: 'كاميرا Prumysl الصقر', isSaqr: true },
-            '1_camera': { label: 'كاميرا Guard Corps', contentId: 'GUARD-CORPS-4G-TRIPLE', unit: GUARD_CORPS_UNIT, back: '../', thumb: '../images/Guardcorp.jpeg', thumbAlt: 'كاميرا Guard Corps', isSaqr: false, hasSdGift: true },
-            '2_camera': { label: 'كاميرا Guard Corps (×2)', contentId: 'GUARD-CORPS-4G-TRIPLE', unit: GUARD_CORPS_UNIT * 2, back: '../', thumb: '../images/Guardcorp.jpeg', thumbAlt: 'كاميرا Guard Corps', isSaqr: false, hasSdGift: true },
-            'guard-corps': { label: 'كاميرا Guard Corps', contentId: 'GUARD-CORPS-4G-TRIPLE', unit: GUARD_CORPS_UNIT, back: '../', thumb: '../images/Guardcorp.jpeg', thumbAlt: 'كاميرا Guard Corps', isSaqr: false, hasSdGift: true },
+            '1_camera': { label: 'كاميرا Guard Corps', contentId: 'GUARD-CORPS-4G-TRIPLE', unit: GUARD_CORPS_UNIT, back: '../', thumb: '../images/Guardcorp.jpeg', thumbAlt: 'كاميرا Guard Corps', isSaqr: false },
+            '2_camera': { label: 'كاميرا Guard Corps (×2)', contentId: 'GUARD-CORPS-4G-TRIPLE', unit: GUARD_CORPS_UNIT * 2, back: '../', thumb: '../images/Guardcorp.jpeg', thumbAlt: 'كاميرا Guard Corps', isSaqr: false },
+            'guard-corps': { label: 'كاميرا Guard Corps', contentId: 'GUARD-CORPS-4G-TRIPLE', unit: GUARD_CORPS_UNIT, back: '../', thumb: '../images/Guardcorp.jpeg', thumbAlt: 'كاميرا Guard Corps', isSaqr: false },
             projectors: { label: 'بروجيكتور شمسي', contentId: 'PROJECTOR-SOLAR', unit: PROJECTOR_300, back: '../', thumb: '../images/300W.webp', thumbAlt: 'بروجيكتور Prumysl الشمسي', isSaqr: false },
             projector: { label: 'بروجيكتور شمسي', contentId: 'PROJECTOR-SOLAR', unit: PROJECTOR_300, back: '../', thumb: '../images/300W.webp', thumbAlt: 'بروجيكتور Prumysl الشمسي', isSaqr: false },
             '300w': { label: 'بروجيكتور شمسي 300 واط', contentId: 'PROJECTOR-300W', unit: PROJECTOR_300, back: '../', thumb: '../images/300W.webp', thumbAlt: 'بروجيكتور 300W', isSaqr: false },
@@ -404,12 +404,6 @@
             if (meta.isSaqr) {
                 const gift = document.createElement('li');
                 gift.textContent = '🎁 بطاقة SD هدية مع كاميرا الصقر';
-                document.getElementById('stepsList').appendChild(gift);
-            }
-
-            if (meta.hasSdGift) {
-                const gift = document.createElement('li');
-                gift.textContent = '🎁 بطاقة SD Philips 128 GB هدية مع Guard Corps';
                 document.getElementById('stepsList').appendChild(gift);
             }
 
