@@ -85,6 +85,15 @@
             global.prumyslFbqPurchase(pp);
         }
 
+        if (typeof global.prumyslGoogleAdsPurchase === 'function') {
+            global.prumyslGoogleAdsPurchase({
+                value: pp.value,
+                source: source,
+                contentId: pp.contentId,
+                transactionId: source + '-' + pp.contentId + '-' + Date.now()
+            });
+        }
+
         runTtq(function () {
             var contents = [{
                 content_id: pp.contentId,
