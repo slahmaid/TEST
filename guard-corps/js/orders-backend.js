@@ -1,5 +1,5 @@
-﻿/**
- * Prumysl unified order API (Google Sheet + Firebase Firestore).
+/**
+ * Prumysl order API — Google Sheet + Admin panel.
  * Call after prumysl-orders-ready or when submitOrderToSheet is defined.
  */
 (function (global) {
@@ -24,9 +24,6 @@
 
     global.PrumyslOrders = {
         submit: submit,
-        ready: ready,
-        isFirebaseReady: function () {
-            return typeof global.prumyslFirebaseReady === 'function' && global.prumyslFirebaseReady();
-        }
+        ready: ready
     };
 })(typeof window !== 'undefined' ? window : this);

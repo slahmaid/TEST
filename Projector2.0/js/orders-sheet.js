@@ -1,92 +1,18 @@
 /**
- * Google Sheet + Firestore orders (works on prumysl.cc even without firebase-config.js on the same host).
- * Config is loaded from the GitHub Pages Actions deploy when local config is missing.
+ * Google Sheet + Admin panel order drop (no Firebase).
+ * Sheet write is unchanged. Admin receives a parallel POST while the panel is running.
  */
 (function (global) {
     var ORDERS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwFR6sq_iWRbW47Nab2rwvyz43nva1BZdWiB_ZirRxXlQBz4LbWk83Vx1ej2ed2TYbC/exec';
-    var FIREBASE_VERSION = '10.14.1';
-    var REMOTE_CONFIG_URL = 'https://slahmaid.github.io/TEST/js/firebase-config.js';
-    var firebaseReady = null;
-    var db = null;
-
-    function loadScript(url) {
-        return new Promise(function (resolve, reject) {
-            var s = global.document.createElement('script');
-            s.src = url;
-            s.async = false;
-            s.onload = function () { resolve(); };
-            s.onerror = function () { reject(new Error(url)); };
-            global.document.head.appendChild(s);
-        });
-    }
-
-    function configUrls() {
-        var urls = ['js/firebase-config.js', '/js/firebase-config.js', REMOTE_CONFIG_URL];
-        var seen = {};
-        return urls.filter(function (u) {
-            if (seen[u]) return false;
-            seen[u] = true;
-            return true;
-        });
-    }
-
-    function loadFirebaseConfig() {
-        var urls = configUrls();
-        var i = 0;
-        function next() {
-            if (i >= urls.length) return Promise.reject(new Error('firebase-config'));
-            return loadScript(urls[i]).catch(function () {
-                i += 1;
-                return next();
-            });
-        }
-        return next();
-    }
-
-    function ensureFirebase() {
-        if (firebaseReady) return firebaseReady;
-        if (typeof global.firebase !== 'undefined' && global.firebase.firestore && global.PRUMYSL_FIREBASE_CONFIG) {
-            try {
-                if (!global.firebase.apps.length) {
-                    global.firebase.initializeApp(global.PRUMYSL_FIREBASE_CONFIG);
-                }
-                db = global.firebase.firestore();
-                firebaseReady = Promise.resolve(db);
-                return firebaseReady;
-            } catch (e) {
-                firebaseReady = null;
-            }
-        }
-        firebaseReady = loadScript('https://www.gstatic.com/firebasejs/' + FIREBASE_VERSION + '/firebase-app-compat.js')
-            .then(function () {
-                return loadScript('https://www.gstatic.com/firebasejs/' + FIREBASE_VERSION + '/firebase-firestore-compat.js');
-            })
-            .then(loadFirebaseConfig)
-            .then(function () {
-                var cfg = global.PRUMYSL_FIREBASE_CONFIG;
-                if (!cfg || !cfg.apiKey || !cfg.projectId) throw new Error('config');
-                if (!global.firebase.apps.length) {
-                    global.firebase.initializeApp(cfg);
-                }
-                db = global.firebase.firestore();
-                return db;
-            })
-            .catch(function (err) {
-                firebaseReady = null;
-                console.warn('[Prumysl] Firebase not available for website orders:', err && err.message ? err.message : err);
-                throw err;
-            });
-        return firebaseReady;
-    }
 
     function detectSource() {
         try {
             var path = (global.location && global.location.pathname) || '';
             if (path.indexOf('moka-pro-max') !== -1) return 'moka-pro-max';
-            if (path.indexOf('/moka') !== -1) return 'moka';
+            if (path.indexOf('/moka') !== -1 || path.indexOf('MMPM') !== -1) return 'moka';
             if (path.indexOf('saqr') !== -1) return 'saqr';
-            if (path.indexOf('Projector2.0') !== -1) return 'Projector2.0';
-            if (path.indexOf('projector') !== -1) return 'projectors';
+            if (path.indexOf('guard') !== -1) return 'guard-corps';
+            if (path.indexOf('projector') !== -1 || path.indexOf('Projector') !== -1) return 'projectors';
             return 'website';
         } catch (_) {
             return 'website';
@@ -102,6 +28,17 @@
         return /^0[67]\d{8}$/.test(d) ? d : '';
     }
 
+    function defaultProduct(source) {
+        var labels = {
+            moka: 'كاميرا موكا',
+            'moka-pro-max': 'موكا برو ماكس',
+            saqr: 'كاميرا الصقر',
+            'guard-corps': 'GUARD CORPS',
+            projectors: 'بروجيكتور شمسي'
+        };
+        return labels[source] || 'طلب موقع';
+    }
+
     function normalizeOrder(order) {
         var quantity = parseInt(order.quantity, 10);
         if (isNaN(quantity) || quantity < 1) quantity = 1;
@@ -109,17 +46,8 @@
         var price = priceRaw === '' || priceRaw == null ? null : parseFloat(String(priceRaw).replace(',', '.'));
         if (price != null && isNaN(price)) price = null;
         var phone = normalizePhone(order.phone);
-        var product = String(order.product || '').trim();
-        if (!product) {
-            var labels = {
-                moka: 'كاميرا موكا',
-                'moka-pro-max': 'موكا برو ماكس',
-                saqr: 'كاميرا الصقر',
-                projectors: 'بروجيكتور شمسي',
-                'Projector2.0': 'بروجيكتور 2.0'
-            };
-            product = labels[order.source || detectSource()] || 'طلب موقع';
-        }
+        var source = String(order.source || detectSource());
+        var product = String(order.product || '').trim() || defaultProduct(source);
         return {
             name: String(order.name || '').trim(),
             city: String(order.city || '').trim(),
@@ -128,36 +56,69 @@
             quantity: quantity,
             price: price,
             status: 'new',
-            source: String(order.source || detectSource()),
-            notes: '',
-            createdAt: global.firebase.firestore.FieldValue.serverTimestamp()
+            source: source
         };
     }
 
-    function submitOrderToFirebase(order) {
-        return ensureFirebase().then(function (firestore) {
-            var data = normalizeOrder(order);
-            if (!data.phone) {
-                console.warn('[Prumysl] Order skipped: phone must be 06/07 + 8 digits');
-                return;
-            }
-            return firestore.collection('orders').add(data).then(function (ref) {
-                console.info('[Prumysl] Order saved to admin:', ref.id);
+    function adminOrdersUrl() {
+        if (global.PRUMYSL_ADMIN_ORDERS_URL) return String(global.PRUMYSL_ADMIN_ORDERS_URL);
+        // Local admin panel (npm run dev on Admin project)
+        return 'http://localhost:5173/api/incoming-orders';
+    }
+
+    function submitOrderToAdmin(order) {
+        var url = adminOrdersUrl();
+        if (!url) return;
+
+        var payload = {
+            name: order.name || '',
+            city: order.city || '',
+            phone: order.phone || '',
+            product: order.product || '',
+            quantity: order.quantity != null ? order.quantity : '',
+            price: order.price != null ? order.price : '',
+            source: order.source || detectSource(),
+            status: order.status || 'new',
+            createdAt: new Date().toLocaleString('en-US', { hour12: false })
+        };
+
+        try {
+            global.fetch(url, {
+                method: 'POST',
+                mode: 'cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                keepalive: true
+            }).then(function (res) {
+                if (!res.ok) {
+                    console.warn('[Prumysl] Admin order HTTP', res.status);
+                    return;
+                }
+                console.info('[Prumysl] Order sent to admin panel');
+            }).catch(function (err) {
+                console.warn('[Prumysl] Admin panel unreachable (sheet still saved):', err && err.message ? err.message : err);
             });
-        }).catch(function (err) {
-            console.error('[Prumysl] Firestore order failed:', err && err.code ? err.code : err);
-        });
+        } catch (err) {
+            console.warn('[Prumysl] Admin order failed:', err);
+        }
     }
 
     function submitOrderToSheet(order) {
+        var data = normalizeOrder(order || {});
+        if (!data.phone) {
+            console.warn('[Prumysl] Order skipped: phone must be 06/07 + 8 digits');
+            return;
+        }
+
+        // 1) Google Sheet (unchanged)
         if (ORDERS_SCRIPT_URL) {
             var body = new URLSearchParams();
-            body.set('name', order.name || '');
-            body.set('city', order.city || '');
-            body.set('phone', order.phone || '');
-            body.set('product', order.product || '');
-            body.set('quantity', String(order.quantity != null ? order.quantity : ''));
-            body.set('price', String(order.price != null ? order.price : ''));
+            body.set('name', data.name || '');
+            body.set('city', data.city || '');
+            body.set('phone', data.phone || '');
+            body.set('product', data.product || '');
+            body.set('quantity', String(data.quantity != null ? data.quantity : ''));
+            body.set('price', String(data.price != null ? data.price : ''));
             global.fetch(ORDERS_SCRIPT_URL, {
                 method: 'POST',
                 mode: 'no-cors',
@@ -165,14 +126,14 @@
                 keepalive: true
             }).catch(function () {});
         }
-    }
 
-    var savedFirebaseSubmit = typeof global.submitOrderToFirebase === 'function'
-        ? global.submitOrderToFirebase
-        : null;
+        // 2) Admin panel drop (direct — no Firebase)
+        submitOrderToAdmin(data);
+    }
 
     global.submitOrderToSheet = submitOrderToSheet;
-    if (!savedFirebaseSubmit) {
-        global.submitOrderToFirebase = submitOrderToFirebase;
-    }
+    // Keep name for older form snippets; routes to sheet + admin only.
+    global.submitOrderToFirebase = function (order) {
+        submitOrderToSheet(order);
+    };
 })(typeof window !== 'undefined' ? window : this);
