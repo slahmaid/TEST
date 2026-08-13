@@ -1339,6 +1339,21 @@
             return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, '0')).join('');
         }
 
+        (function () {
+            const el = document.querySelector('form.order-form input[name="product_offer"]');
+            const offer = (el && el.value) || '1_camera';
+            const numItems = offer === '2_camera' ? 2 : 1;
+            if (typeof fbq !== 'undefined') {
+                fbq('track', 'ViewContent', {
+                    content_type: 'product',
+                    content_ids: ['GUARD-CORPS-4G-TRIPLE'],
+                    content_name: 'Prumysl Guard Corps',
+                    currency: 'MAD',
+                    value: 999 * numItems
+                });
+            }
+        })();
+
         mokaTtqReady(function () {
             const el = document.querySelector('form.order-form input[name="product_offer"]');
             const offer = (el && el.value) || '1_camera';
@@ -1396,6 +1411,13 @@
                 const numItems = offer === '2_camera' ? 2 : 1;
                 const unitPrice = 999;
                 if (typeof fbq !== 'undefined') {
+                    fbq('track', 'AddToCart', {
+                        content_type: 'product',
+                        content_ids: ['GUARD-CORPS-4G-TRIPLE'],
+                        currency: 'MAD',
+                        value: unitPrice * numItems,
+                        num_items: numItems
+                    });
                     fbq('track', 'InitiateCheckout', {
                         content_type: 'product',
                         content_ids: ['GUARD-CORPS-4G-TRIPLE'],
