@@ -17,4 +17,8 @@
 /Projector2.0/thank-you/index.html /Projector2.0/thank-you/ 301
 /MMPM300/index.html /MMPM300/ 301
 /MMPM300/thank-you/index.html /MMPM300/thank-you/ 301
+/PE/index.html /PE/ 301
+/PE/thank-you/index.html /PE/thank-you/ 301
+/crimping-pliers/ /PE/ 301
+/crimping-pliers/* /PE/:splat 301
 /admin/index.html /admin/ 301

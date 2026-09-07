@@ -149,7 +149,7 @@
 
         const params = new URLSearchParams(window.location.search);
         const name = params.get('name') || '';
-        const productOffer = params.get('product') || 'crimping_pliers';
+        const productOffer = params.get('product') || 'PE';
 
         const numItems = Math.max(1, parseInt(params.get('quantity') || '', 10) || 1);
         const priceParam = parseInt(params.get('price') || '', 10);
@@ -163,7 +163,7 @@
 
         if (typeof prumyslFireThankYouConversion === 'function') {
             prumyslFireThankYouConversion({
-                source: 'crimping-pliers',
+                source: 'PE',
                 pp: {
                     contentId: MOKA_CONTENT_ID,
                     contentName: 'Prumysl بانس',

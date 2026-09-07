@@ -6,7 +6,7 @@
     var ORDERS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxipqw5BU47MnNPHIUqF4iM6D5D2pCYs_0yGcUpY_5zyCqe7M_m6LT7EShsn-zbmZo/exec';
 
     function detectSource() {
-        return 'crimping-pliers';
+        return 'PE';
     }
 
     function normalizePhone(raw) {

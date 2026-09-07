@@ -1,15 +1,15 @@
 # Crimping pliers — implementation plan
 
 **Date:** 2026-09-07  
-**Spec:** `docs/superpowers/specs/2026-09-07-crimping-pliers-design.md`
+**Spec:** `docs/superpowers/specs/2026-09-07-PE-design.md`
 
 ## Files
 
-- Create `crimping-pliers/` from `moka/` template (CSS/JS structure)
-- `crimping-pliers/index.html` — product copy, 269/299, noindex, placeholders
-- `crimping-pliers/thank-you/index.html` — product-specific thank-you
-- `crimping-pliers/js/orders-sheet.js` — dedicated `ORDERS_SCRIPT_URL`
-- `google-apps-script/crimping-pliers-orders.gs` — orders-only script (reference)
+- Create `PE/` from `moka/` template (CSS/JS structure)
+- `PE/index.html` — product copy, 269/299, noindex, placeholders
+- `PE/thank-you/index.html` — product-specific thank-you
+- `PE/js/orders-sheet.js` — dedicated `ORDERS_SCRIPT_URL`
+- `google-apps-script/PE-orders.gs` — orders-only script (reference)
 - Do **not** edit `index.html` catalog or `js/thank-you-recommendations.js`
 
 ## Tasks
@@ -22,6 +22,6 @@
 
 ## Verify
 
-- Grep repo: no `crimping-pliers` href from homepage/recommendations  
+- Grep repo: no `PE` href from homepage/recommendations  
 - `orders-sheet.js` URL matches the dedicated `/exec`  
 - Page meta has `noindex`
