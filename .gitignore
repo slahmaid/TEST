@@ -8,3 +8,5 @@ desktop.ini
 !**/firebase-config.example.js
 **/admin-config.js
 !**/admin-config.example.js
+
+.cursor/
