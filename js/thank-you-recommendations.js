@@ -16,7 +16,7 @@
             id: 'moka-pro-max',
             name: 'موكا برو ماكس',
             desc: '3 عدسات PTZ، زووم بصري 10×',
-            price: '699 درهم',
+            price: '649 درهم',
             image: 'images/Home-Moka-Pro-Max.jpeg',
             href: 'moka-pro-max/',
             tag: 'الأكثر مبيعاً'

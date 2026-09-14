@@ -10,7 +10,7 @@
         {
             contentId: 'MOKA-PRO-MAX',
             contentName: 'موكا برو ماكس',
-            price: 699
+            price: 649
         }
     ];
 

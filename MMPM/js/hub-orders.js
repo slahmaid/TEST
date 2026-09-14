@@ -12,7 +12,7 @@
         },
         'moka-pro-max': {
             label: 'موكا برو ماكس',
-            price: 699,
+            price: 649,
             source: 'moka-pro-max',
             thankYou: '../moka-pro-max/thank-you/',
             contentId: 'MOKA-PRO-MAX',
