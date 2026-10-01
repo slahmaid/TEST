@@ -5,12 +5,12 @@
         {
             contentId: 'MOKA-4G-DUAL',
             contentName: 'كاميرا موكا',
-            price: 599
+            price: 699
         },
         {
             contentId: 'MOKA-PRO-MAX',
             contentName: 'موكا برو ماكس',
-            price: 649
+            price: 799
         }
     ];
 

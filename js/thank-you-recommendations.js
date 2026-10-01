@@ -7,7 +7,7 @@
             id: 'moka',
             name: 'كاميرا موكا الذكية',
             desc: 'عدستان، 12MP، 4G، V380 Pro',
-            price: '599 درهم',
+            price: '699 درهم',
             image: 'images/Home-Moka.jpeg',
             href: 'moka/',
             tag: '4G'
@@ -16,7 +16,7 @@
             id: 'moka-pro-max',
             name: 'موكا برو ماكس',
             desc: '3 عدسات PTZ، زووم بصري 10×',
-            price: '649 درهم',
+            price: '799 درهم',
             image: 'images/Home-Moka-Pro-Max.jpeg',
             href: 'moka-pro-max/',
             tag: 'الأكثر مبيعاً'
