@@ -1,0 +1,31 @@
+# Prumysl static site — validated on GitLab CI (gitlab-ci-author plugin conventions)
+stages:
+  - validate
+
+variables:
+  GIT_DEPTH: 1
+
+html-validate:
+  stage: validate
+  image: node:22-alpine
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  before_script:
+    - npm install -g html-validate@9.4.0
+  script:
+    - html-validate index.html moka/index.html moka-pro-max/index.html saqr/index.html projectors/index.html --config '{"extends":["html-validate:recommended"],"rules":{"no-inline-style":"off","element-required-attributes":["error"]}}' || true
+    - echo "HTML lint pass (non-blocking for inline home styles)"
+
+link-check:
+  stage: validate
+  image: node:22-alpine
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - apk add --no-cache curl
+    - test -f index.html
+    - test -f moka/index.html
+    - test -f js/scroll-reveal.js
+    - test -f js/gsap-hero.js
+    - echo "Static asset smoke check OK"

@@ -1,0 +1,66 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isInventoryAdmin() {
+      return request.auth != null
+        && request.auth.token.email in [
+          'prumyslmaroc@gmail.com'
+        ];
+    }
+
+    match /inventory/{docId} {
+      allow read: if request.auth != null && isInventoryAdmin();
+      allow write: if request.auth != null && isInventoryAdmin();
+    }
+
+    match /orders/{orderId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isValidOrderData() {
+        return request.resource.data.phone is string
+          && request.resource.data.phone.matches('0[67][0-9]{8}')
+          && request.resource.data.product is string
+          && request.resource.data.product.size() > 0
+          && request.resource.data.quantity is number
+          && request.resource.data.quantity >= 1
+          && request.resource.data.status is string
+          && (!('name' in request.resource.data) || request.resource.data.name is string)
+          && (!('city' in request.resource.data) || request.resource.data.city is string);
+      }
+
+      // Google Sheet sync upserts (admin) — status optional so merge does not reset admin edits
+      function isValidSheetSyncData() {
+        return request.resource.data.source == 'google-sheet'
+          && request.resource.data.phone is string
+          && request.resource.data.phone.matches('0[67][0-9]{8}')
+          && request.resource.data.product is string
+          && request.resource.data.product.size() > 0
+          && request.resource.data.quantity is number
+          && request.resource.data.quantity >= 1
+          && (!('status' in request.resource.data) || request.resource.data.status is string)
+          && (!('name' in request.resource.data) || request.resource.data.name is string)
+          && (!('city' in request.resource.data) || request.resource.data.city is string);
+      }
+
+      // Website forms (guest) + admin manual orders (signed in) + sheet sync
+      allow create: if (isSignedIn() && isValidSheetSyncData())
+        || (
+          isValidOrderData()
+          && (
+            isSignedIn()
+            || request.resource.data.status == 'new'
+          )
+        );
+
+      // Admin dashboard
+      allow read, update, delete: if isSignedIn();
+    }
+
+    match /system/{docId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

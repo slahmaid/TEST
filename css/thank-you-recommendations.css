@@ -1,0 +1,159 @@
+.recommended-products-mount:empty {
+    display: none;
+}
+
+.recommended-products {
+    padding: 8px 15px 40px;
+    background: transparent;
+}
+
+.recommended-products__inner {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.recommended-products h2 {
+    font-size: 1.35rem;
+    font-weight: 900;
+    color: #202895;
+    text-align: center;
+    margin-bottom: 6px;
+}
+
+.recommended-products__lead {
+    text-align: center;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #666;
+    margin-bottom: 20px;
+}
+
+.recommended-products__grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+}
+
+.rec-card {
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(32, 40, 149, 0.1);
+    box-shadow: 0 8px 24px rgba(32, 40, 149, 0.06);
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rec-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px rgba(32, 40, 149, 0.1);
+}
+
+.rec-card__media {
+    display: block;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    background: #f4f5ff;
+}
+
+.rec-card__media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    opacity: 1;
+}
+
+/* Product style.css hides lazy images until .loaded — thank-you has no loader */
+.recommended-products .rec-card__media img[loading="lazy"] {
+    opacity: 1;
+}
+
+.rec-card__body {
+    padding: 12px 14px 14px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    text-align: right;
+}
+
+.rec-card__tag {
+    display: inline-block;
+    align-self: flex-start;
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: #202895;
+    background: #f4f5ff;
+    padding: 3px 8px;
+    border-radius: 999px;
+    margin-bottom: 6px;
+}
+
+.rec-card h3 {
+    font-size: 0.95rem;
+    font-weight: 900;
+    color: #111;
+    margin-bottom: 4px;
+    line-height: 1.35;
+}
+
+.rec-card p {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #666;
+    line-height: 1.5;
+    margin-bottom: 10px;
+    flex: 1;
+}
+
+.rec-card__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: auto;
+}
+
+.rec-card__price {
+    font-size: 0.95rem;
+    font-weight: 900;
+    color: #d90429;
+}
+
+.rec-card__cta {
+    font-size: 0.78rem;
+    font-weight: 900;
+    color: #fff;
+    background: #202895;
+    padding: 8px 12px;
+    border-radius: 10px;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.rec-card__cta:hover {
+    filter: brightness(1.08);
+}
+
+@media (min-width: 640px) {
+    .recommended-products__grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+    }
+
+    .rec-card h3 {
+        font-size: 0.88rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .rec-card__footer {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .rec-card__cta {
+        text-align: center;
+    }
+}

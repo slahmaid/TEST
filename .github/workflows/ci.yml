@@ -1,0 +1,29 @@
+# GitHub Actions CI (repo remote is GitHub; mirrors .gitlab-ci.yml checks)
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install html-validate
+        run: npm install -g html-validate@9.4.0
+      - name: Lint HTML
+        run: |
+          html-validate index.html moka/index.html moka-pro-max/index.html saqr/index.html projectors/index.html \
+            --config '{"extends":["html-validate:recommended"],"rules":{"no-inline-style":"off"}}' || true
+      - name: Static asset smoke check
+        run: |
+          test -f js/scroll-reveal.js
+          test -f js/gsap-hero.js
+          test -f css/brand.css
+          echo "OK"

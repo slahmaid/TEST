@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Prumysl — إدارة الطلبات</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div id="configWarn" class="config-warn hidden">Firebase غير مُعدّ بعد. انسخ <code>js/firebase-config.example.js</code> إلى <code>js/firebase-config.js</code> واملأ بيانات مشروعك، ثم فعّل Email/Password في Authentication.</div>
+    <section id="loginView" class="login-wrap">
+        <div class="login-card">
+            <div class="login-brand"><div class="logo-mark">P</div><h2>Prumysl</h2><p>لوحة إدارة الطلبات — جميع المنتجات</p></div>
+            <form id="loginForm">
+                <div class="form-group"><label for="loginEmail">البريد الإلكتروني</label><input type="email" id="loginEmail" name="email" required autocomplete="username"></div>
+                <div class="form-group"><label for="loginPassword">كلمة المرور</label><input type="password" id="loginPassword" name="password" required autocomplete="current-password"></div>
+                <button type="submit" class="btn btn-primary btn-login">دخول إلى اللوحة</button>
+                <p id="loginError" class="form-error" role="alert"></p>
+            </form>
+        </div>
+    </section>
+    <section id="dashboardView" class="hidden">
+        <div class="app-shell">
+            <aside class="admin-sidebar">
+                <div class="sidebar-brand"><div class="logo-mark">P</div><span>Prumysl</span></div>
+                <ul class="sidebar-nav">
+                    <li><a href="#" id="navOrders" class="active" data-view="orders"><span class="nav-icon" aria-hidden="true"><i class="fa-solid fa-list"></i></span> الطلبات</a></li>
+                    <li><a href="#" id="navManual" data-view="manual"><span class="nav-icon" aria-hidden="true"><i class="fa-solid fa-plus"></i></span> طلب يدوي</a></li>
+                    <li><a href="#" id="navOzon" data-view="ozon"><span class="nav-icon" aria-hidden="true"><i class="fa-solid fa-truck-fast"></i></span> Ozon Express</a></li>
+                    <li class="hidden" data-nav-tier="inventory"><a href="#" id="navInventory" data-view="inventory"><span class="nav-icon" aria-hidden="true"><i class="fa-solid fa-boxes-stacked"></i></span> مخزون المنتجات</a></li>
+                </ul>
+                <div class="sidebar-footer"><span class="admin-user" id="userEmailSidebar"></span><button type="button" class="btn btn-ghost btn-sm" id="logoutBtnSidebar"><i class="fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i> خروج</button></div>
+            </aside>
+            <div class="app-main">
+                <header class="admin-topbar">
+                    <div>
+                        <h1 id="pageTitle">إدارة الطلبات</h1>
+                        <p class="subtitle" id="pageSubtitle">موكا · موكا برو ماكس · الصقر · البروجيكتورات</p>
+                        <p class="subtitle subtitle-sync" id="sheetSyncStatus">مزامنة Google Sheet: —</p>
+                    </div>
+                    <div class="topbar-actions">
+                        <button type="button" class="btn btn-primary btn-sm" id="newOrderBtn">طلب يدوي</button>
+                        <button type="button" class="btn btn-secondary btn-sm" id="refreshBtn">تحديث</button>
+                        <button type="button" class="btn btn-secondary btn-sm" id="exportBtn">تصدير CSV</button>
+                        <button type="button" class="btn btn-ghost btn-sm" id="logoutBtn">خروج</button>
+                    </div>
+                </header>
+                <main class="admin-content">
+                    <div id="viewOrders" class="admin-view">
+                        <div class="content-stack">
+                        <div class="stats-grid">
+                            <div class="stat-card"><div class="label">إجمالي الطلبات</div><div id="statTotal" class="value">0</div></div>
+                            <div class="stat-card stat-new"><div class="label">طلبات جديدة</div><div id="statNew" class="value">0</div></div>
+                            <div class="stat-card stat-today"><div class="label">اليوم</div><div id="statToday" class="value">0</div></div>
+                            <div class="stat-card stat-revenue"><div class="label">قيمة تقريبية (د.م)</div><div id="statRevenue" class="value">0</div></div>
+                        </div>
+                        <div id="productChips" class="product-chips"></div>
+                        <button type="button" class="toolbar-toggle" id="filterToggle" aria-expanded="false" aria-controls="filterPanel">الفلاتر</button>
+                        <div class="toolbar" id="filterPanel">
+                            <div class="form-group"><label for="filterSearch">بحث</label><input type="search" id="filterSearch" placeholder="اسم، هاتف، مدينة..."></div>
+                            <div class="form-group"><label for="filterStatus">الحالة</label><select id="filterStatus"><option value="">الكل</option><option value="new">جديد</option><option value="confirmed">مؤكد</option><option value="shipped">قيد الشحن</option><option value="delivered">تم التسليم</option><option value="cancelled">ملغي</option></select></div>
+                            <div class="form-group"><label for="filterProduct">المنتج</label><select id="filterProduct"></select></div>
+                            <div class="form-group"><label for="filterDate">الفترة</label><select id="filterDate"><option value="all">كل الفترات</option><option value="today">اليوم</option><option value="week">آخر 7 أيام</option><option value="month">آخر 30 يوماً</option></select></div>
+                        </div>
+                        <div class="bulk-bar hidden" id="bulkBar">
+                            <span id="bulkCount">0 محدد</span>
+                            <button type="button" class="btn btn-secondary btn-sm" id="bulkConfirmBtn">تأكيد المحدد</button>
+                            <button type="button" class="btn btn-ozon btn-sm" id="bulkOzonBtn">إرسال إلى Ozon</button>
+                            <button type="button" class="btn btn-danger btn-sm" id="bulkDeleteBtn">حذف المحدد</button>
+                            <button type="button" class="btn btn-ghost btn-sm" id="bulkClearBtn">إلغاء التحديد</button>
+                        </div>
+                        <div class="orders-panel">
+                            <div class="panel-header"><h2>قائمة الطلبات</h2><span class="count-badge" id="ordersCountBadge">0</span></div>
+                            <div id="ordersLoading" class="loading-bar hidden"><div class="loading-spinner"></div> جاري تحميل الطلبات...</div>
+                            <div id="ordersEmpty" class="empty-state hidden"><p>لا توجد طلبات مطابقة للفلتر.</p></div>
+                            <div class="table-wrap table-wrap--orders"><table class="orders-table orders-table--compact"><thead><tr><th class="col-check"><input type="checkbox" id="selectAllOrders" title="تحديد الكل"></th><th class="col-date">تاريخ</th><th class="col-client">عميل</th><th class="col-phone">هاتف</th><th class="col-product">منتج</th><th class="col-amount">كم · سعر</th><th class="col-status">حالة</th><th class="col-actions">إجراء</th></tr></thead><tbody id="ordersBody"></tbody></table></div>
+                            <div id="ordersCards" class="orders-cards" aria-label="قائمة الطلبات"></div>
+                        </div>
+                        </div>
+                    </div>
+
+                    <div id="viewManual" class="admin-view hidden">
+                        <div class="manual-panel">
+                            <div class="panel-header"><h2>إضافة طلب يدوي</h2><p class="panel-desc">للطلبات الهاتفية، واتساب، أو نقاط البيع</p></div>
+                            <form id="manualOrderForm" class="manual-form">
+                                <div class="form-grid">
+                                    <div class="form-group"><label for="manualName">الاسم الكامل</label><input type="text" id="manualName" autocomplete="name"></div>
+                                    <div class="form-group"><label for="manualCity">المدينة</label><input type="text" id="manualCity"></div>
+                                    <div class="form-group"><label for="manualPhone">الهاتف *</label><input type="tel" id="manualPhone" required dir="ltr" placeholder="06XXXXXXXX أو 2126XXXXXXXX" maxlength="12" inputmode="numeric"></div>
+                                    <div class="form-group"><label for="manualProduct">المنتج *</label><select id="manualProduct" required></select></div>
+                                    <div class="form-group"><label for="manualQty">الكمية</label><input type="number" id="manualQty" min="1" max="99" value="1"></div>
+                                    <div class="form-group"><label for="manualPrice">السعر (د.م)</label><input type="number" id="manualPrice" min="0" step="1" placeholder="تلقائي حسب المنتج"></div>
+                                    <div class="form-group"><label for="manualStatus">الحالة</label><select id="manualStatus"><option value="new">جديد</option><option value="confirmed" selected>مؤكد</option><option value="shipped">قيد الشحن</option><option value="delivered">تم التسليم</option></select></div>
+                                    <div class="form-group"><label for="manualSource">المصدر</label><select id="manualSource"><option value="admin-phone">هاتف</option><option value="admin-whatsapp">واتساب</option><option value="admin-store">متجر / معرض</option><option value="admin-manual">يدوي</option></select></div>
+                                </div>
+                                <div class="form-group"><label for="manualNotes">ملاحظات داخلية</label><textarea id="manualNotes" rows="3" placeholder="مثال: يريد التوصيل يوم السبت"></textarea></div>
+                                <label class="checkbox-row"><input type="checkbox" id="manualSyncSheet" checked> مزامنة مع Google Sheet</label>
+                                <div class="form-actions">
+                                    <button type="submit" class="btn btn-primary" id="manualSubmitBtn">حفظ الطلب</button>
+                                    <button type="button" class="btn btn-secondary" id="manualResetBtn">مسح الحقول</button>
+                                </div>
+                                <p id="manualFormError" class="form-error" role="alert"></p>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div id="viewInventory" class="admin-view hidden">
+                        <div class="content-stack">
+                            <div class="stats-grid inventory-stats">
+                                <div class="stat-card"><div class="label">منتجات</div><div id="inventoryStatSkus" class="value">0</div></div>
+                                <div class="stat-card"><div class="label">وحدات مُباعة (طلبات)</div><div id="inventoryStatSold" class="value">0</div></div>
+                                <div class="stat-card stat-new"><div class="label">تنبيه مخزون منخفض</div><div id="inventoryStatLow" class="value">0</div></div>
+                            </div>
+                            <p class="inventory-hint">المخزن الرئيسي = إجمالي المنتجات. المحل = الكمية في المتجر — عند زيادة المحل يُحدَّث المخزن الرئيسي تلقائياً بنفس الفرق. المتبقّي = المخزن الرئيسي − الطلبات (غير الملغاة).</p>
+                            <div class="orders-panel">
+                                <div class="panel-header">
+                                    <h2>مخزون المنتجات</h2>
+                                    <span class="count-badge" id="inventoryCountBadge">0</span>
+                                </div>
+                                <div id="inventoryEmpty" class="empty-state hidden"><p>لا توجد منتجات في المخزون بعد.</p></div>
+                                <div class="table-wrap table-wrap--inventory">
+                                    <table class="orders-table inventory-table">
+                                        <thead>
+                                            <tr>
+                                                <th>المنتج</th>
+                                                <th>المخزن الرئيسي</th>
+                                                <th>المحل</th>
+                                                <th>مُباع (طلبات)</th>
+                                                <th>متبقّي</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="inventoryBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="viewOzon" class="admin-view hidden">
+                        <div class="content-stack">
+                            <div class="ozon-stats-grid" id="ozonStatsGrid"></div>
+                            <div class="toolbar ozon-toolbar">
+                                <div class="form-group"><label for="ozonFilterSearch">بحث</label>
+                                    <input type="search" id="ozonFilterSearch" placeholder="اسم، هاتف، تتبع..."></div>
+                                <div class="form-group"><label for="ozonFilterLocal">حالة الطلب</label>
+                                    <select id="ozonFilterLocal">
+                                        <option value="">الكل</option>
+                                        <option value="shipped">قيد الشحن</option>
+                                        <option value="delivered">تم التسليم</option>
+                                        <option value="confirmed">مؤكد</option>
+                                    </select>
+                                </div>
+                                <div class="form-group ozon-toolbar-actions">
+                                    <button type="button" class="btn btn-secondary btn-sm" id="ozonRefreshAllBtn">تحديث حالات Ozon</button>
+                                </div>
+                            </div>
+                            <div class="orders-panel">
+                                <div class="panel-header"><h2>طلبات Ozon Express</h2><span class="count-badge" id="ozonCountBadge">0</span></div>
+                                <p class="ozon-page-hint">الطلبات المُرسلة إلى Ozon. استخدم «تحديث» لمزامنة حالة التتبع.</p>
+                                <div id="ozonEmpty" class="empty-state hidden"><p>لا توجد طلبات مُرسلة إلى Ozon بعد.</p></div>
+                                <div class="table-wrap table-wrap--orders">
+                                    <table class="orders-table orders-table--ozon">
+                                        <thead>
+                                            <tr>
+                                                <th>تاريخ الإرسال</th>
+                                                <th>عميل</th>
+                                                <th>تتبع Ozon</th>
+                                                <th>حالة Ozon</th>
+                                                <th>حالة الطلب</th>
+                                                <th>السعر</th>
+                                                <th>إجراء</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="ozonOrdersBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </section>
+
+    <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="التنقل الرئيسي">
+        <a href="#" class="mobile-nav-item active" data-view="orders"><span class="mobile-nav-icon" aria-hidden="true"><i class="fa-solid fa-list"></i></span><span>الطلبات</span></a>
+        <a href="#" class="mobile-nav-item" data-view="manual"><span class="mobile-nav-icon" aria-hidden="true"><i class="fa-solid fa-plus"></i></span><span>يدوي</span></a>
+        <a href="#" class="mobile-nav-item" data-view="ozon"><span class="mobile-nav-icon" aria-hidden="true"><i class="fa-solid fa-truck-fast"></i></span><span>Ozon</span></a>
+        <a href="#" class="mobile-nav-item hidden" data-view="inventory" data-nav-tier="inventory"><span class="mobile-nav-icon" aria-hidden="true"><i class="fa-solid fa-boxes-stacked"></i></span><span>مخزون</span></a>
+        <button type="button" class="mobile-nav-item mobile-nav-item--btn" id="mobileLogoutBtn"><span class="mobile-nav-icon" aria-hidden="true"><i class="fa-solid fa-arrow-right-from-bracket"></i></span><span>خروج</span></button>
+    </nav>
+
+    <div id="orderDetailModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="detailModalTitle">
+        <div class="modal-backdrop" data-close-modal></div>
+        <div class="modal-panel modal-panel--wide">
+            <header class="modal-header">
+                <h2 id="detailModalTitle">تفاصيل الطلب</h2>
+                <button type="button" class="modal-close" data-close-modal aria-label="إغلاق">×</button>
+            </header>
+            <div id="orderDetailBody" class="modal-body"></div>
+            <footer class="modal-footer">
+                <button type="button" class="btn btn-ozon btn-sm" id="detailOzonBtn"><i class="fa-solid fa-truck-fast" aria-hidden="true"></i> Ozon Express</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="detailDuplicateBtn">نسخ كطلب جديد</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="detailCallBtn"><i class="fa-solid fa-phone" aria-hidden="true"></i> اتصال</button>
+                <button type="button" class="btn btn-primary btn-sm" data-close-modal>إغلاق</button>
+            </footer>
+        </div>
+    </div>
+
+
+    <div id="ozonPushModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="ozonModalTitle">
+        <div class="modal-backdrop" data-close-ozon></div>
+        <div class="modal-panel modal-panel--wide">
+            <header class="modal-header">
+                <h2 id="ozonModalTitle">إرسال إلى Ozon Express</h2>
+                <button type="button" class="modal-close" data-close-ozon aria-label="إغلاق">×</button>
+            </header>
+            <div class="modal-body">
+                <p class="ozon-hint">يتم الإرسال عبر Google Apps Script — المفتاح لا يُخزَّن في الموقع.</p>
+                <p id="ozonExistingTracking" class="ozon-tracking-banner hidden"></p>
+                <form id="ozonPushForm" class="ozon-form">
+                    <div class="form-grid ozon-form-grid">
+                        <div class="form-group"><label for="ozonReceiver">المستلم *</label><input type="text" id="ozonReceiver" required></div>
+                        <div class="form-group"><label for="ozonPhone">الهاتف *</label><input type="tel" id="ozonPhone" required dir="ltr" maxlength="10"></div>
+                        <div class="form-group form-group--full">
+                            <label for="ozonCitySearch">بحث مدينة Ozon</label>
+                            <input type="search" id="ozonCitySearch" placeholder="Casablanca, Rabat, Marrakech...">
+                        </div>
+                        <div class="form-group form-group--full">
+                            <label for="ozonCityId">مدينة Ozon (ID) *</label>
+                            <select id="ozonCityId" required></select>
+                        </div>
+                        <div class="form-group form-group--full">
+                            <label for="ozonAddress">العنوان الكامل *</label>
+                            <textarea id="ozonAddress" rows="3" required placeholder="الحي، الشارع، رقم المنزل — مثال: المعاريف، شارع بنسليمان، عمارة 5"></textarea>
+                            <span class="field-hint">لا تكتفي باسم المدينة فقط.</span>
+                        </div>
+                        <div class="form-group"><label for="ozonPrice">السعر COD (د.م) *</label><input type="number" id="ozonPrice" min="0" step="1" required></div>
+                        <div class="form-group"><label for="ozonDeclared">قيمة مُعلَنة</label><input type="number" id="ozonDeclared" min="50" step="1"></div>
+                        <div class="form-group"><label for="ozonStock">نوع الشحن</label>
+                            <select id="ozonStock"><option value="0" selected>راماساج (بدون مخزون Ozon)</option><option value="1">مخزون Ozon (يتطلب ref)</option></select>
+                        </div>
+                        <div class="form-group form-group--full ozon-stock-extra hidden" id="ozonStockExtra">
+                            <label for="ozonProductRef">مرجع منتج Ozon (ref)</label>
+                            <input type="text" id="ozonProductRef" placeholder="SKU في حساب Ozon">
+                        </div>
+                        <div class="form-group"><label for="ozonOpen">فتح الطرد</label>
+                            <select id="ozonOpen"><option value="">افتراضي</option><option value="1">مسموح</option><option value="2">ممنوع</option></select>
+                        </div>
+                        <div class="form-group"><label for="ozonFragile">هش</label>
+                            <select id="ozonFragile"><option value="">لا</option><option value="1">نعم</option></select>
+                        </div>
+                        <div class="form-group form-group--full">
+                            <label for="ozonNature">محتوى الطرد</label>
+                            <input type="text" id="ozonNature">
+                        </div>
+                        <div class="form-group form-group--full">
+                            <label for="ozonNote">ملاحظة</label>
+                            <input type="text" id="ozonNote">
+                        </div>
+                    </div>
+                    <p id="ozonFormError" class="form-error" role="alert"></p>
+                </form>
+            </div>
+            <footer class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" id="ozonTestBtn">اختبار API</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-close-ozon>إلغاء</button>
+                <button type="submit" form="ozonPushForm" class="btn btn-ozon btn-sm" id="ozonSubmitBtn">إرسال الطرد</button>
+            </footer>
+        </div>
+    </div>
+    <div id="toastHost" class="toast-host"></div>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+    <script src="../js/firebase-config.js"></script>
+    <script src="../js/admin-config.js" onerror="(function(){var s=document.createElement('script');s.src='../js/admin-config.example.js';document.head.appendChild(s);})();"></script>
+    <script src="../js/phone-ma.js"></script>
+    <script src="js/admin-animations.js"></script>
+    <script src="js/ozon-delivery.js"></script>
+    <script src="js/admin-inventory.js"></script>
+    <script src="js/admin-app.js"></script>
+    <script>document.addEventListener('DOMContentLoaded',function(){if(window.PrAdminAnim)PrAdminAnim.animateLoginEnter();});</script>
+</body>
+</html>
