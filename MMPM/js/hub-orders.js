@@ -4,7 +4,7 @@
     var PRODUCTS = {
         moka: {
             label: 'كاميرا موكا',
-            price: 699,
+            price: 599,
             source: 'moka',
             thankYou: '../moka/thank-you/',
             contentId: 'MOKA-4G-DUAL',
@@ -12,7 +12,7 @@
         },
         'moka-pro-max': {
             label: 'موكا برو ماكس',
-            price: 799,
+            price: 699,
             source: 'moka-pro-max',
             thankYou: '../moka-pro-max/thank-you/',
             contentId: 'MOKA-PRO-MAX',
