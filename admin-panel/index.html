@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'">
+  <title>Prumysl — لوحة الطلبات</title>
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body class="adm-body">
+
+  <!-- ============ تسجيل الدخول ============ -->
+  <main class="login" id="login" hidden>
+    <form class="login-card" id="loginForm" novalidate>
+      <div class="login-top">
+        <span class="logo-chip"><img src="prumysl-logo.svg" alt="Prumysl" width="282" height="100"></span>
+        <span class="login-tag">الإدارة</span>
+      </div>
+      <h1 class="login-title">إدارة الطلبات</h1>
+      <p class="login-sub">جميع طلبات الموقع: موكا، موكا برو ماكس، الصقر، البروجيكتورات، البانس…</p>
+      <input type="text" name="username" value="admin" autocomplete="username" hidden>
+      <label class="fld"><span>مفتاح الإدارة</span>
+        <input type="password" id="loginKey" name="password" autocomplete="current-password" required minlength="1" spellcheck="false" dir="ltr">
+      </label>
+      <label class="chk"><input type="checkbox" id="loginRemember"><span>تذكّرني على هذا الجهاز (30 يوماً)</span></label>
+      <p class="login-err" id="loginErr" role="alert" hidden></p>
+      <button type="submit" class="btn btn-accent btn-lg" id="loginBtn">دخول</button>
+    </form>
+  </main>
+
+  <!-- ============ التطبيق ============ -->
+  <div class="adm" id="app" hidden>
+    <header class="top">
+      <span class="top-logo logo-chip"><img src="prumysl-logo.svg" alt="Prumysl" width="282" height="100"></span>
+      <div class="top-title"><span class="top-tag">الإدارة</span><strong>الطلبات</strong></div>
+      <button type="button" class="top-new" id="newBadge" hidden></button>
+      <div class="top-sync" id="sync" aria-live="polite"><span class="dot"></span><span id="syncTxt">جارٍ التحميل…</span></div>
+      <div class="top-act">
+        <button type="button" class="ibtn" id="refreshBtn" title="تحديث (R)" aria-label="تحديث">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="btn btn-ghost" id="logoutBtn" aria-label="خروج"><svg class="flip" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lo-t">خروج</span></button>
+      </div>
+    </header>
+
+    <nav class="stabs" id="storeTabs" role="tablist" aria-label="المتجر"></nav>
+
+    <div class="store-warn" id="storeWarn" role="status" hidden></div>
+
+    <section class="kpis" id="kpiBoard" aria-label="المؤشرات">
+      <div class="kpi-head">
+        <h2>نظرة عامة</h2>
+        <div class="seg" id="period" role="tablist" aria-label="الفترة">
+          <button type="button" data-p="today" role="tab">اليوم</button>
+          <button type="button" data-p="7d" role="tab">7 أيام</button>
+          <button type="button" data-p="30d" role="tab">30 يوماً</button>
+          <button type="button" data-p="all" role="tab">الكل</button>
+        </div>
+      </div>
+      <div class="kpi-grid" id="kpis"></div>
+    </section>
+
+    <section class="board" id="ordersBoard" aria-label="الطلبات">
+      <div class="tools">
+        <div class="chips" id="chips" role="tablist" aria-label="تصفية حسب الحالة"></div>
+        <div class="filters">
+          <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+            <input type="search" id="q" placeholder="الاسم، الهاتف، رقم الطلب، المدينة، المنتج…  ( / )" aria-label="بحث" autocomplete="off" spellcheck="false"></label>
+          <label class="sel sel-prod"><span class="sr">المنتج</span>
+            <select id="product" aria-label="المنتج"><option value="">كل المنتجات</option></select></label>
+          <label class="date"><span>من</span><input type="date" id="from"></label>
+          <label class="date"><span>إلى</span><input type="date" id="to"></label>
+          <label class="sel"><span class="sr">الترتيب</span>
+            <select id="sort" aria-label="الترتيب">
+              <option value="new">الأحدث أولاً</option>
+              <option value="old">الأقدم أولاً</option>
+              <option value="tdesc">المبلغ: من الأعلى</option>
+              <option value="tasc">المبلغ: من الأقل</option>
+              <option value="name">الاسم أ ← ي</option>
+              <option value="status">حسب الحالة</option>
+            </select></label>
+          <button type="button" class="btn btn-ghost-d" id="resetBtn">مسح الفلاتر</button>
+          <button type="button" class="btn btn-dark" id="csvBtn">تصدير CSV</button>
+        </div>
+      </div>
+      <div class="table-wrap" id="tableWrap">
+        <table class="otable" id="otable">
+          <thead><tr>
+            <th scope="col">رقم الطلب</th><th scope="col">تاريخ الاستلام</th><th scope="col">العميل</th><th scope="col">الهاتف</th>
+            <th scope="col">المدينة</th><th scope="col">المنتج</th><th scope="col" class="num">المبلغ</th><th scope="col">الحالة</th><th scope="col" class="act-h">إجراءات</th>
+          </tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div class="empty" id="empty" hidden></div>
+      </div>
+      <div class="pager" id="pager"></div>
+    </section>
+  </div>
+
+  <!-- ============ تفاصيل الطلب ============ -->
+  <div class="scrim" id="scrim" hidden></div>
+  <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="dTitle" hidden tabindex="-1"></aside>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

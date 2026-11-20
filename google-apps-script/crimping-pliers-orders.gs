@@ -1,7 +1,10 @@
 /**
  * Crimping pliers — Google Sheet orders only
  * Columns: Date | Name | City | Phone Number | Product | Quantity | Price
+ * Admin panel (admin-panel/): add admin-api.gs to this project and set the ADMIN_KEY script property
+ * (same key as the main store) — see ADMIN-SETUP.md. Orders here get IDs PE-1001, PE-1002…
  */
+var ADMIN_ORDER_PREFIX = 'PE';
 var SHEET_NAME = 'Orders';
 var HEADERS = ['Date', 'Name', 'City', 'Phone Number', 'Product', 'Quantity', 'Price'];
 
@@ -49,13 +52,18 @@ function parsePostParams_(e) {
   return p;
 }
 
-function doGet() {
+function doGet(e) {
+  var action = (e && e.parameter && e.parameter.action) || '';
+  if (action === 'admin_ping' && typeof adminPingResponse_ === 'function') return adminPingResponse_();
   return ContentService.createTextOutput('Crimping pliers orders OK')
     .setMimeType(ContentService.MimeType.TEXT);
 }
 
 function doPost(e) {
   try {
+    // JSON calls from the admin panel (admin-api.gs)
+    if (typeof isAdminRequest_ === 'function' && isAdminRequest_(e)) return adminApi_(e);
+
     var p = parsePostParams_(e);
     setupSheet();
 
@@ -68,7 +76,7 @@ function doPost(e) {
       if (!isNaN(n) && n >= 0) price = n;
     }
 
-    getOrdersSheet_().appendRow([
+    var base = [
       new Date(),
       String(p.name || '').trim(),
       String(p.city || '').trim(),
@@ -76,7 +84,11 @@ function doPost(e) {
       String(p.product || 'بانس').trim(),
       quantity,
       price
-    ]);
+    ];
+    // with admin-api.gs: H = status « جديد », J–N = admin columns (column I is never written)
+    getOrdersSheet_().appendRow(typeof adminNewOrderRow_ === 'function'
+      ? adminNewOrderRow_(base, p.source || 'PE')
+      : base);
 
     return jsonOut_({ status: 'ok' });
   } catch (err) {
