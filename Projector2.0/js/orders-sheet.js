@@ -119,6 +119,7 @@
             body.set('product', data.product || '');
             body.set('quantity', String(data.quantity != null ? data.quantity : ''));
             body.set('price', String(data.price != null ? data.price : ''));
+            body.set('source', data.source || '');
             global.fetch(ORDERS_SCRIPT_URL, {
                 method: 'POST',
                 mode: 'no-cors',

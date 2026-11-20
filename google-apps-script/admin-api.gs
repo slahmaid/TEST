@@ -1,0 +1,451 @@
+/**
+ * Prumysl — Admin API for the admin panel (admin-panel/).
+ *
+ * Add this file NEXT TO all-orders.gs (main store) — and next to crimping-pliers-orders.gs (PE store) —
+ * in the same Apps Script project (Apps Script editor › + › Script › name it "admin-api").
+ * It shares SHEET_NAME / setupSheet() / getOrdersSheet_() with the file beside it.
+ *
+ * Layout of the « Orders » sheet (columns A–G are NOT changed, the old admin keeps working):
+ *   A–G  Date · Name · City · Phone Number · Product · Quantity · Price   (written by the site)
+ *   H    Order Statut   ← status, updated by the admin panel and coloured like the panel
+ *   I    (your own column — never read or written by this script)
+ *   J Order ID · K Note · L Updated · M History · N Source
+ *
+ * Setup (once per Apps Script project) — see ADMIN-SETUP.md:
+ *   1. Project Settings › Script properties › add  ADMIN_KEY = <your secret, 8+ characters>
+ *      (use the SAME key in both projects so one login opens both stores).
+ *   2. Deploy › Manage deployments › ✏️ › Version: New version › Deploy (the /exec URL stays the same).
+ *
+ * Protocol (POST, body = JSON as text/plain):  { action: 'auth' | 'list' | 'update', key: <ADMIN_KEY or session token>, ... }
+ * The admin key never leaves Google: the panel stores only a signed, expiring session token.
+ */
+
+var ADMIN_API_VERSION = 3;
+var ADMIN_COL = { status: 8, id: 10, note: 11, updated: 12, hist: 13, source: 14 }; // H, J, K, L, M, N
+var ADMIN_TOTAL_COLS = 14; // A..N
+var ADMIN_STATUS_HEADER = 'Order Statut';
+var ADMIN_EXTRA_FIRST = 10; // J
+var ADMIN_EXTRA_HEADERS = ['Order ID', 'Note', 'Updated', 'History', 'Source']; // J..N
+var ADMIN_STATUSES = ['جديد', 'مؤكد', 'تم الشحن', 'تم التسليم', 'ملغي', 'مرتجع'];
+// same colours as the admin panel's status pills: [text, background]
+var ADMIN_STATUS_COLORS = {
+  'جديد': ['#e0402a', '#fbe8e5'],
+  'مؤكد': ['#202895', '#e4e5f2'],
+  'تم الشحن': ['#b07000', '#f6eee0'],
+  'تم التسليم': ['#17803f', '#e3f0e8'],
+  'ملغي': ['#6b6b78', '#ededef'],
+  'مرتجع': ['#7b3fb2', '#efe8f6']
+};
+// statuses typed by hand in the sheet (French / English / other spellings) → panel status
+var ADMIN_STATUS_ALIASES = {
+  'new': 'جديد', 'nouvelle': 'جديد', 'nouveau': 'جديد', 'pending': 'جديد', 'en attente': 'جديد', 'جديدة': 'جديد',
+  'confirmed': 'مؤكد', 'confirmée': 'مؤكد', 'confirmee': 'مؤكد', 'confirmé': 'مؤكد', 'confirme': 'مؤكد', 'تم التأكيد': 'مؤكد', 'مؤكدة': 'مؤكد',
+  'shipped': 'تم الشحن', 'expédiée': 'تم الشحن', 'expediee': 'تم الشحن', 'expédié': 'تم الشحن', 'en cours': 'تم الشحن', 'قيد الشحن': 'تم الشحن', 'في الطريق': 'تم الشحن',
+  'delivered': 'تم التسليم', 'livrée': 'تم التسليم', 'livree': 'تم التسليم', 'livré': 'تم التسليم', 'livre': 'تم التسليم', 'مسلم': 'تم التسليم', 'تم التوصيل': 'تم التسليم',
+  'cancelled': 'ملغي', 'canceled': 'ملغي', 'annulée': 'ملغي', 'annulee': 'ملغي', 'annulé': 'ملغي', 'ملغى': 'ملغي', 'ملغية': 'ملغي',
+  'returned': 'مرتجع', 'retournée': 'مرتجع', 'retournee': 'مرتجع', 'retour': 'مرتجع', 'مرجع': 'مرتجع'
+};
+var ADMIN_TZ = 'Africa/Casablanca';
+var ADMIN_MIN_KEY = 8;
+var ADMIN_MAX_TRIES = 5;
+var ADMIN_LOCK_SECONDS = 900;
+var ADMIN_SESSION_HOURS = 12;
+var ADMIN_REMEMBER_DAYS = 30;
+var ADMIN_LAYOUT_VERSION = '3';
+
+function adminPrefix_() {
+  return (typeof ADMIN_ORDER_PREFIX === 'string' && ADMIN_ORDER_PREFIX) ? ADMIN_ORDER_PREFIX : 'PR';
+}
+
+function adminOut_(obj) {
+  obj.version = ADMIN_API_VERSION;
+  obj.service = 'prumysl-admin';
+  obj.store = adminPrefix_();
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+/** GET ?action=admin_ping — lets the panel check the script is up to date before sending anything. */
+function adminPingResponse_() {
+  return adminOut_({ ok: true, ping: true });
+}
+
+/** True when doPost received a JSON admin call (the shop's order forms send form-encoded data, never JSON). */
+function isAdminRequest_(e) {
+  if (!e || !e.postData || !e.postData.contents) return false;
+  var c = String(e.postData.contents).replace(/^\s+/, '');
+  if (c.charAt(0) !== '{') return false;
+  try {
+    var d = JSON.parse(c);
+    return !!d && typeof d.action === 'string' && ['auth', 'list', 'update'].indexOf(d.action) >= 0;
+  } catch (err) {
+    return false;
+  }
+}
+
+/** The row the site's order forms append (A..N). Used by doPost in all-orders.gs / crimping-pliers-orders.gs. */
+function adminNewOrderRow_(base, source) {
+  var row = base.slice(0, 7);
+  while (row.length < 7) row.push('');
+  row.push('جديد');                       // H Order Statut
+  row.push('');                           // I (your column — left empty)
+  row.push('', '', '', '');               // J Order ID (given by the admin API) · K Note · L Updated · M History
+  row.push(String(source || '').trim());  // N Source
+  return row;
+}
+
+function adminApi_(e) {
+  var d;
+  try { d = JSON.parse(e.postData.contents); } catch (err) { return adminOut_({ ok: false, error: 'bad_action' }); }
+  try {
+    var auth = adminCheck_(d.key);
+    if (!auth.ok) return adminOut_(auth);
+    if (d.action === 'auth') return adminOut_({ ok: true, token: adminMakeToken_(!!d.remember) });
+    if (d.action === 'list') return adminList_();
+    if (d.action === 'update') return adminUpdate_(d);
+    return adminOut_({ ok: false, error: 'bad_action' });
+  } catch (err) {
+    return adminOut_({ ok: false, error: 'server', detail: String(err && err.message || err) });
+  }
+}
+
+// ---------- auth ----------
+function adminSecret_() {
+  return String(PropertiesService.getScriptProperties().getProperty('ADMIN_KEY') || '').trim();
+}
+
+function adminSign_(msg, secret) {
+  var raw = Utilities.computeHmacSha256Signature(msg, secret);
+  return Utilities.base64EncodeWebSafe(raw).replace(/=+$/, '');
+}
+
+function adminSafeEq_(a, b) {
+  a = String(a); b = String(b);
+  if (a.length !== b.length) return false;
+  var diff = 0;
+  for (var i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+function adminMakeToken_(remember) {
+  var exp = Math.floor(Date.now() / 1000) + (remember ? ADMIN_REMEMBER_DAYS * 86400 : ADMIN_SESSION_HOURS * 3600);
+  var head = 'v1.' + exp;
+  return head + '.' + adminSign_(head, adminSecret_());
+}
+
+function adminCheck_(key) {
+  var secret = adminSecret_();
+  if (!secret) return { ok: false, error: 'no_admin_key', reason: 'missing', min: ADMIN_MIN_KEY };
+  if (secret.length < ADMIN_MIN_KEY) return { ok: false, error: 'no_admin_key', reason: 'short', min: ADMIN_MIN_KEY };
+
+  var cache = CacheService.getScriptCache();
+  var nowS = Math.floor(Date.now() / 1000);
+  var lockedUntil = Number(cache.get('adm_locked') || 0);
+  if (lockedUntil > nowS) return { ok: false, error: 'locked', retryIn: lockedUntil - nowS };
+
+  key = String(key || '');
+  if (/^v1\.\d{10}\.[A-Za-z0-9_-]+$/.test(key)) {
+    var parts = key.split('.');
+    if (adminSafeEq_(parts[2], adminSign_('v1.' + parts[1], secret)) && Number(parts[1]) > nowS) return { ok: true };
+    return { ok: false, error: 'expired' }; // expired, or ADMIN_KEY was changed (signs every device out)
+  }
+
+  if (key && adminSafeEq_(key, secret)) {
+    cache.remove('adm_fails');
+    return { ok: true };
+  }
+
+  var fails = Number(cache.get('adm_fails') || 0) + 1;
+  if (fails >= ADMIN_MAX_TRIES) {
+    cache.put('adm_locked', String(nowS + ADMIN_LOCK_SECONDS), ADMIN_LOCK_SECONDS);
+    cache.remove('adm_fails');
+    return { ok: false, error: 'locked', retryIn: ADMIN_LOCK_SECONDS };
+  }
+  cache.put('adm_fails', String(fails), ADMIN_LOCK_SECONDS);
+  return { ok: false, error: 'bad_key', left: ADMIN_MAX_TRIES - fails };
+}
+
+// ---------- sheet ----------
+function adminSheet_() {
+  setupSheet();
+  var sheet = getOrdersSheet_();
+
+  // H: your status column — keep its title, only name it when empty
+  var hHead = sheet.getRange(1, ADMIN_COL.status);
+  if (!String(hHead.getValue() || '').trim()) hHead.setValue(ADMIN_STATUS_HEADER).setFontWeight('bold');
+
+  // J..N: admin columns
+  var head = sheet.getRange(1, ADMIN_EXTRA_FIRST, 1, ADMIN_EXTRA_HEADERS.length).getValues()[0];
+  var fix = false;
+  for (var i = 0; i < ADMIN_EXTRA_HEADERS.length; i++) {
+    var cur = String(head[i] || '').trim();
+    if (!cur) { fix = true; continue; }
+    if (cur !== ADMIN_EXTRA_HEADERS[i]) {
+      throw new Error('Column ' + String.fromCharCode(64 + ADMIN_EXTRA_FIRST + i) + '1 of sheet "' + SHEET_NAME +
+        '" already holds "' + cur + '" — expected "' + ADMIN_EXTRA_HEADERS[i] + '". Move that data, then retry.');
+    }
+  }
+  if (fix) {
+    sheet.getRange(1, ADMIN_EXTRA_FIRST, 1, ADMIN_EXTRA_HEADERS.length).setValues([ADMIN_EXTRA_HEADERS]).setFontWeight('bold');
+  }
+
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('ADMIN_LAYOUT') !== ADMIN_LAYOUT_VERSION) {
+    var lock = adminLock_();
+    if (lock) {
+      try {
+        // re-check under the lock: a parallel call may have done it meanwhile
+        if (props.getProperty('ADMIN_LAYOUT') !== ADMIN_LAYOUT_VERSION) {
+          adminRepairOldRows_(sheet);
+          adminStatusColors_(sheet);
+          props.setProperty('ADMIN_LAYOUT', ADMIN_LAYOUT_VERSION);
+        }
+      } finally {
+        lock.releaseLock();
+      }
+    }
+  }
+  return sheet;
+}
+
+/**
+ * Colours column H like the admin panel (conditional formatting, so it also works for new rows
+ * and for statuses typed by hand). Our previous rules are replaced; your other rules are kept.
+ */
+function adminStatusColors_(sheet) {
+  var maxRows = Math.max(sheet.getMaxRows(), 2);
+  var range = sheet.getRange(2, ADMIN_COL.status, maxRows - 1, 1);
+  var kept = sheet.getConditionalFormatRules().filter(function (rule) {
+    var cond = rule.getBooleanCondition && rule.getBooleanCondition();
+    if (!cond || cond.getCriteriaType() !== SpreadsheetApp.BooleanCriteria.TEXT_EQUAL_TO) return true;
+    var v = String((cond.getCriteriaValues() || [])[0] || '');
+    if (ADMIN_STATUSES.indexOf(v) < 0) return true;
+    return !rule.getRanges().some(function (r) { return r.getColumn() === ADMIN_COL.status; });
+  });
+  var ours = ADMIN_STATUSES.map(function (s) {
+    return SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo(s)
+      .setFontColor(ADMIN_STATUS_COLORS[s][0])
+      .setBackground(ADMIN_STATUS_COLORS[s][1])
+      .setBold(true)
+      .setRanges([range])
+      .build();
+  });
+  sheet.setConditionalFormatRules(ours.concat(kept));
+}
+
+/**
+ * One-time repair of orders saved by the first version of this script, which wrote the status in I
+ * and the source in M. Only rows that look exactly like that are touched: H empty, I = "جديد",
+ * J–L empty and M empty or a page name (moka, saqr…).
+ */
+function adminRepairOldRows_(sheet) {
+  var last = sheet.getLastRow();
+  if (last <= 1) return;
+  var values = sheet.getRange(2, 1, last - 1, ADMIN_TOTAL_COLS).getValues();
+  var cells = [];          // A1 refs of the rows to fix (H, I, M)
+  var sources = [];        // new content of column N (ours), written in one call
+  var touched = false;
+  for (var i = 0; i < values.length; i++) {
+    var r = values[i];
+    var src = String(r[12] || '').trim();
+    var curN = r[13] == null ? '' : r[13];
+    if (!String(r[7] || '').trim() && String(r[8] || '').trim() === 'جديد' &&
+        !String(r[9] || '').trim() && !String(r[10] || '').trim() && !String(r[11] || '').trim() &&
+        (!src || /^[A-Za-z][A-Za-z0-9.-]{0,40}$/.test(src))) {
+      cells.push(i + 2);
+      if (src && !String(curN).trim()) { curN = src; touched = true; }
+    }
+    sources.push([curN]);
+  }
+  if (!cells.length) return;
+  // batched writes (one call per column), only on the matching cells — formulas elsewhere in I are left as they are
+  sheet.getRangeList(cells.map(function (n) { return 'H' + n; })).setValue('جديد');
+  sheet.getRangeList(cells.map(function (n) { return 'I' + n; })).clearContent();
+  sheet.getRangeList(cells.map(function (n) { return 'M' + n; })).clearContent();
+  if (touched) sheet.getRange(2, ADMIN_COL.source, sources.length, 1).setValues(sources);
+}
+
+function adminLock_() {
+  var lock = LockService.getScriptLock();
+  return lock.tryLock(15000) ? lock : null;
+}
+
+function adminNextId_(props) {
+  var seq = Number(props.getProperty('ADMIN_SEQ') || 1000) + 1;
+  props.setProperty('ADMIN_SEQ', String(seq));
+  return adminPrefix_() + '-' + seq;
+}
+
+/**
+ * Reads the order date of column A. Dates typed or pasted as text are read day-first (12/06/2026 = 12 June),
+ * as in Morocco — JavaScript would read them month-first (6 December) and put old orders on top as "future" ones.
+ * A date in the future that makes sense with day and month swapped (a cell typed day-first in a sheet set to a
+ * US locale) is swapped back.
+ */
+function adminDate_(v) {
+  var d = null;
+  if (v instanceof Date && !isNaN(v.getTime())) {
+    d = v;
+  } else if (v !== '' && v != null) {
+    var s = String(v).trim();
+    var m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})(?:[ T,]+(\d{1,2})[:h](\d{2})(?::(\d{2}))?)?/);
+    if (m) {
+      var y = Number(m[3]); if (y < 100) y += 2000;
+      d = new Date(y, Number(m[2]) - 1, Number(m[1]), Number(m[4] || 0), Number(m[5] || 0), Number(m[6] || 0));
+      if (d.getMonth() !== Number(m[2]) - 1) d = null; // e.g. 31/02 or month > 12
+    } else {
+      d = new Date(s);
+    }
+    if (d && isNaN(d.getTime())) d = null;
+  }
+  if (d && d.getTime() > Date.now() + 36 * 3600e3 && d.getDate() <= 12) {
+    var sw = new Date(d.getFullYear(), d.getDate() - 1, d.getMonth() + 1, d.getHours(), d.getMinutes(), d.getSeconds());
+    if (sw.getTime() <= Date.now() + 36 * 3600e3 && sw.getDate() === d.getMonth() + 1) d = sw;
+  }
+  return d;
+}
+
+function adminStatus_(v) {
+  var s = String(v || '').trim();
+  if (ADMIN_STATUSES.indexOf(s) >= 0) return s;
+  var alias = ADMIN_STATUS_ALIASES[s.toLowerCase()];
+  return alias || 'جديد';
+}
+
+function adminHist_(v) {
+  if (!v) return [];
+  try { var h = JSON.parse(v); return Object.prototype.toString.call(h) === '[object Array]' ? h : []; } catch (err) { return []; }
+}
+
+function adminFmt_(v) {
+  return v instanceof Date ? Utilities.formatDate(v, ADMIN_TZ, 'dd/MM/yyyy HH:mm') : String(v || '');
+}
+
+function adminRowToOrder_(r, rowNumber) {
+  var d = adminDate_(r[0]);
+  var qty = parseInt(r[5], 10);
+  if (isNaN(qty) || qty < 1) qty = 1;
+  var total = parseFloat(String(r[6] == null ? '' : r[6]).replace(',', '.'));
+  if (isNaN(total)) total = 0;
+  return {
+    id: String(r[ADMIN_COL.id - 1] || ''),
+    row: rowNumber,
+    ts: d ? d.getTime() : 0,
+    day: d ? Utilities.formatDate(d, ADMIN_TZ, 'yyyy-MM-dd') : '',
+    recu: d ? Utilities.formatDate(d, ADMIN_TZ, 'dd/MM/yyyy HH:mm') : String(r[0] || ''),
+    name: String(r[1] || '').trim(),
+    city: String(r[2] || '').trim(),
+    phone: String(r[3] || '').replace(/\D/g, '').replace(/^([67]\d{8})$/, '0$1'),
+    product: String(r[4] || '').trim(),
+    qty: qty,
+    total: total,
+    status: adminStatus_(r[ADMIN_COL.status - 1]),
+    note: String(r[ADMIN_COL.note - 1] || ''),
+    updated: adminFmt_(r[ADMIN_COL.updated - 1]),
+    hist: adminHist_(r[ADMIN_COL.hist - 1]),
+    source: String(r[ADMIN_COL.source - 1] || '')
+  };
+}
+
+function adminIsEmptyRow_(r) {
+  for (var i = 0; i < 7; i++) if (String(r[i] == null ? '' : r[i]).trim() !== '') return false;
+  return true;
+}
+
+function adminList_() {
+  var sheet = adminSheet_();
+  var last = sheet.getLastRow();
+  var today = Utilities.formatDate(new Date(), ADMIN_TZ, 'yyyy-MM-dd');
+  if (last <= 1) return adminOut_({ ok: true, now: Date.now(), today: today, orders: [] });
+
+  var values = sheet.getRange(2, 1, last - 1, ADMIN_TOTAL_COLS).getValues();
+  var idIdx = ADMIN_COL.id - 1;
+
+  // give an Order ID (column J) to rows that don't have one yet
+  var missing = values.some(function (r) { return !adminIsEmptyRow_(r) && !String(r[idIdx] || '').trim(); });
+  if (missing) {
+    var lock = adminLock_();
+    if (!lock) return adminOut_({ ok: false, error: 'busy' });
+    try {
+      // re-read under the lock: another call may have stamped them meanwhile
+      last = sheet.getLastRow();
+      values = sheet.getRange(2, 1, last - 1, ADMIN_TOTAL_COLS).getValues();
+      var props = PropertiesService.getScriptProperties();
+      var ids = [];
+      var changed = false;
+      for (var j = 0; j < values.length; j++) {
+        var id = String(values[j][idIdx] || '').trim();
+        if (!id && !adminIsEmptyRow_(values[j])) { id = adminNextId_(props); values[j][idIdx] = id; changed = true; }
+        ids.push([id]);
+      }
+      if (changed) sheet.getRange(2, ADMIN_COL.id, ids.length, 1).setValues(ids);
+    } finally {
+      lock.releaseLock();
+    }
+  }
+
+  var orders = [];
+  for (var k = 0; k < values.length; k++) {
+    if (adminIsEmptyRow_(values[k])) continue;
+    orders.push(adminRowToOrder_(values[k], k + 2));
+  }
+  return adminOut_({ ok: true, now: Date.now(), today: today, orders: orders });
+}
+
+function adminUpdate_(d) {
+  var id = String(d.id || '').trim();
+  if (!id) return adminOut_({ ok: false, error: 'not_found' });
+  var hasStatus = d.status != null;
+  var hasNote = d.note != null;
+  if (hasStatus && ADMIN_STATUSES.indexOf(String(d.status)) < 0) return adminOut_({ ok: false, error: 'bad_status' });
+
+  var sheet = adminSheet_();
+  var lock = adminLock_();
+  if (!lock) return adminOut_({ ok: false, error: 'busy' });
+  try {
+    var last = sheet.getLastRow();
+    if (last <= 1) return adminOut_({ ok: false, error: 'not_found' });
+    var col = sheet.getRange(2, ADMIN_COL.id, last - 1, 1).getValues();
+    var rowNumber = 0;
+    for (var i = 0; i < col.length; i++) {
+      if (String(col[i][0]).trim() === id) { rowNumber = i + 2; break; }
+    }
+    if (!rowNumber) return adminOut_({ ok: false, error: 'not_found' });
+
+    var r = sheet.getRange(rowNumber, 1, 1, ADMIN_TOTAL_COLS).getValues()[0];
+    var S = ADMIN_COL.status - 1, N = ADMIN_COL.note - 1, U = ADMIN_COL.updated - 1, Hh = ADMIN_COL.hist - 1;
+    var cur = adminStatus_(r[S]);
+    var hist = adminHist_(r[Hh]);
+    var at = Utilities.formatDate(new Date(), ADMIN_TZ, 'dd/MM/yyyy HH:mm');
+    var changed = false;
+    var writeStatus = false;
+
+    if (hasStatus && String(d.status) !== cur) {
+      hist.push({ at: at, from: cur, to: String(d.status) });
+      r[S] = String(d.status);
+      writeStatus = changed = true;
+    } else if (String(r[S] || '').trim() !== cur) {
+      // empty or hand-typed (e.g. "Livrée") → write the panel's Arabic status so H stays coloured
+      r[S] = cur;
+      writeStatus = true;
+    }
+    if (hasNote) {
+      var note = String(d.note).slice(0, 1000).trim();
+      if (note !== String(r[N] || '')) {
+        hist.push({ at: at, note: note ? 'تعديل الملاحظة الداخلية' : 'حذف الملاحظة الداخلية' });
+        r[N] = note;
+        changed = true;
+      }
+    }
+    if (writeStatus) sheet.getRange(rowNumber, ADMIN_COL.status).setValue(r[S]);
+    if (changed) {
+      if (hist.length > 60) hist = hist.slice(-60);
+      r[U] = at;
+      r[Hh] = JSON.stringify(hist);
+      sheet.getRange(rowNumber, ADMIN_COL.note, 1, 3).setValues([[r[N], r[U], r[Hh]]]);
+    }
+    return adminOut_({ ok: true, order: adminRowToOrder_(r, rowNumber) });
+  } finally {
+    lock.releaseLock();
+  }
+}

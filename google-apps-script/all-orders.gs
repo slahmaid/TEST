@@ -9,6 +9,8 @@
  * 3. Run setupOzonCredentials('YOUR_CLIENT_ID', 'YOUR_API_KEY') once (see OZON-SETUP.md).
  * 4. Deploy → New deployment → Web app: Execute as Me, Who has access: Anyone.
  * 5. Copy the /exec URL into js/orders-sheet.js and admin/js/admin-app.js → ORDERS_SCRIPT_URL
+ * 6. Admin panel (admin-panel/): add admin-api.gs to this project and set the ADMIN_KEY script property
+ *    — see ADMIN-SETUP.md. It manages column H (Order Statut, coloured) and J–N (Order ID, Note, Updated, History, Source); column I is left alone.
  */
 
 var SHEET_NAME = 'Orders';
@@ -520,6 +522,7 @@ function ozonParcelStatusResponse_(p) {
 
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) || '';
+  if (action === 'admin_ping' && typeof adminPingResponse_ === 'function') return adminPingResponse_();
   if (action === 'sheet_orders') return sheetOrdersResponse_(e.parameter || {});
   if (action === 'ozon_cities') return ozonGetCitiesResponse_();
   if (action === 'ozon_test') return ozonTestResponse_();
@@ -531,6 +534,9 @@ function doGet(e) {
 
 function doPost(e) {
   try {
+    // JSON calls from the admin panel (admin-api.gs)
+    if (typeof isAdminRequest_ === 'function' && isAdminRequest_(e)) return adminApi_(e);
+
     var p = parsePostParams_(e);
     if (p.action === 'ozon_add_parcel') return ozonAddParcelResponse_(p);
 
@@ -538,7 +544,7 @@ function doPost(e) {
     var quantity = parseQuantity_(p);
     var price = parsePrice_(p);
 
-    getOrdersSheet_().appendRow([
+    var base = [
       new Date(),
       String(p.name || '').trim(),
       String(p.city || '').trim(),
@@ -546,7 +552,11 @@ function doPost(e) {
       productLabel_(p),
       quantity,
       price
-    ]);
+    ];
+    // with admin-api.gs: H = status « جديد », J–N = admin columns (column I is never written)
+    getOrdersSheet_().appendRow(typeof adminNewOrderRow_ === 'function'
+      ? adminNewOrderRow_(base, p.source || '')
+      : base);
 
     return jsonOut_({ status: 'ok' });
   } catch (err) {
