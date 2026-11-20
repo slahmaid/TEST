@@ -1,4 +1,4 @@
-/* Prumysl — لوحة إدارة الطلبات (admin-panel/).
+/* Prumysl — لوحة إدارة الطلبات (prumyslmarocadmin2026/).
    Reads and updates the orders that the site's order forms send to the Google Apps Script web apps
    (same URLs as ORDERS_SCRIPT_URL in each product folder's js/orders-sheet.js). The admin side of those scripts lives in
    google-apps-script/admin-api.gs. The admin key is checked by Google, server-side: this page only keeps

@@ -1,5 +1,5 @@
 /**
- * Prumysl — Admin API for the admin panel (admin-panel/).
+ * Prumysl — Admin API for the admin panel (prumyslmarocadmin2026/).
  *
  * Add this file NEXT TO all-orders.gs (main store) — and next to crimping-pliers-orders.gs (PE store) —
  * in the same Apps Script project (Apps Script editor › + › Script › name it "admin-api").
