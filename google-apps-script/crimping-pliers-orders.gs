@@ -1,7 +1,7 @@
 /**
  * Crimping pliers — Google Sheet orders only
  * Columns: Date | Name | City | Phone Number | Product | Quantity | Price
- * Admin panel (admin-panel/): add admin-api.gs to this project and set the ADMIN_KEY script property
+ * Admin panel (prumyslmarocadmin2026/): add admin-api.gs to this project and set the ADMIN_KEY script property
  * (same key as the main store) — see ADMIN-SETUP.md. Orders here get IDs PE-1001, PE-1002…
  */
 var ADMIN_ORDER_PREFIX = 'PE';
