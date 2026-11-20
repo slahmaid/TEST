@@ -283,3 +283,36 @@ button.kpi:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(15,1
   .stab em { display: none; }
   .stab.off::after { content: "!"; color: #b07000; font-weight: 900; }
 }
+
+/* ---------- order editing + SD card ---------- */
+.btn-sm { height: 32px; padding: 0 12px; font-size: 12.5px; }
+.qbtn.e { display: inline-flex; align-items: center; gap: 5px; background: #fff; color: var(--accent); box-shadow: inset 0 0 0 1.5px #cfd2ea; }
+.qbtn.e:hover { background: var(--accent); color: #fff; box-shadow: none; }
+.sd-tag { font-style: normal; display: inline-block; font-size: 11px; font-weight: 800; color: #0b6b5a; background: #ddf3ee; border-radius: 999px; padding: 0 8px; margin-inline-start: 4px; vertical-align: 1px; white-space: nowrap; }
+.sd-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; background: #fff; border-radius: 12px; padding: 8px 10px 8px 8px; font-size: 13.5px; font-weight: 700; }
+.sd-pick { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.rad { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding-inline: 10px 14px; border-radius: 999px; background: var(--panel); font-size: 13px; font-weight: 700; cursor: pointer; transition: background .15s, color .15s; }
+.rad input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
+.rad.on { background: var(--accent); color: #fff; } .rad.on input { accent-color: #fff; }
+.rad:has(input:disabled) { opacity: .55; cursor: default; }
+.rad:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.edit-card { box-shadow: inset 0 0 0 2px var(--accent); background: #f3f4fc; }
+.egrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.efld { display: grid; gap: 5px; min-width: 0; }
+.efld.wide { grid-column: 1 / -1; }
+.efld > span { font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.efld input:not([type="radio"]), .efld textarea { width: 100%; min-width: 0; border: 0; border-radius: 12px; background: #fff; padding: 10px 12px; font-size: 15px; box-shadow: inset 0 0 0 1.5px var(--line); }
+.efld input:not([type="radio"]) { height: 44px; }
+.efld textarea { resize: vertical; min-height: 64px; line-height: 1.5; }
+.efld input[dir="ltr"] { text-align: right; }
+.efld input:not([type="radio"]):focus, .efld textarea:focus { outline: none; box-shadow: inset 0 0 0 2px var(--accent); }
+.efld .rad { background: #fff; box-shadow: inset 0 0 0 1.5px var(--line); } .efld .rad.on { background: var(--accent); box-shadow: none; }
+.edit-err { background: #fdecea; color: #a1261a; border-radius: 10px; padding: 9px 12px; font-size: 13px; font-weight: 600; }
+.edit-act { justify-content: flex-end; gap: 8px; }
+.edit-act .btn { min-width: 110px; }
+@media (max-width: 760px) {
+  .egrid { grid-template-columns: minmax(0, 1fr); }
+  .otable td.c-act .qbtn.e span { display: none; }
+  .otable td.c-act .qbtn.e { flex: 0 0 44px; justify-content: center; padding: 0; }
+  .edit-act .btn { flex: 1; }
+}
