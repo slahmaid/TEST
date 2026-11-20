@@ -9,7 +9,7 @@
  *   A–G  Date · Name · City · Phone Number · Product · Quantity · Price   (written by the site)
  *   H    Order Statut   ← status, updated by the admin panel and coloured like the panel
  *   I    (your own column — never read or written by this script)
- *   J Order ID · K Note · L Updated · M History · N Source
+ *   J Order ID · K Note · L Updated · M History · N Source · O SD Card (نعم / لا)
  *
  * Setup (once per Apps Script project) — see ADMIN-SETUP.md:
  *   1. Project Settings › Script properties › add  ADMIN_KEY = <your secret, 8+ characters>
@@ -20,12 +20,14 @@
  * The admin key never leaves Google: the panel stores only a signed, expiring session token.
  */
 
-var ADMIN_API_VERSION = 3;
-var ADMIN_COL = { status: 8, id: 10, note: 11, updated: 12, hist: 13, source: 14 }; // H, J, K, L, M, N
-var ADMIN_TOTAL_COLS = 14; // A..N
+var ADMIN_API_VERSION = 4; // 4 = order editing (name, phone, city/address, product, quantity, amount, SD card)
+var ADMIN_COL = { status: 8, id: 10, note: 11, updated: 12, hist: 13, source: 14, sd: 15 }; // H, J, K, L, M, N, O
+var ADMIN_TOTAL_COLS = 15; // A..O
 var ADMIN_STATUS_HEADER = 'Order Statut';
 var ADMIN_EXTRA_FIRST = 10; // J
-var ADMIN_EXTRA_HEADERS = ['Order ID', 'Note', 'Updated', 'History', 'Source']; // J..N
+var ADMIN_EXTRA_HEADERS = ['Order ID', 'Note', 'Updated', 'History', 'Source', 'SD Card']; // J..O
+// products whose name already says it includes a memory card (when column O is still empty)
+var ADMIN_SD_RE = /carte\s*m[ée]moire|memory\s*card|micro\s*sd|\bsd\b|بطاقة\s*(ال)?ذاكرة|ذاكرة\s*sd/i;
 var ADMIN_STATUSES = ['جديد', 'مؤكد', 'تم الشحن', 'تم التسليم', 'ملغي', 'مرتجع'];
 // same colours as the admin panel's status pills: [text, background]
 var ADMIN_STATUS_COLORS = {
@@ -90,6 +92,7 @@ function adminNewOrderRow_(base, source) {
   row.push('');                           // I (your column — left empty)
   row.push('', '', '', '');               // J Order ID (given by the admin API) · K Note · L Updated · M History
   row.push(String(source || '').trim());  // N Source
+  row.push('');                           // O SD Card (empty = read from the product name)
   return row;
 }
 
@@ -321,6 +324,13 @@ function adminFmt_(v) {
   return v instanceof Date ? Utilities.formatDate(v, ADMIN_TZ, 'dd/MM/yyyy HH:mm') : String(v || '');
 }
 
+function adminSd_(v, product) {
+  var s = String(v || '').trim().toLowerCase();
+  if (s === 'نعم' || s === 'yes' || s === 'oui' || s === 'true' || s === '1') return true;
+  if (s === 'لا' || s === 'no' || s === 'non' || s === 'false' || s === '0') return false;
+  return ADMIN_SD_RE.test(String(product || ''));
+}
+
 function adminRowToOrder_(r, rowNumber) {
   var d = adminDate_(r[0]);
   var qty = parseInt(r[5], 10);
@@ -343,7 +353,8 @@ function adminRowToOrder_(r, rowNumber) {
     note: String(r[ADMIN_COL.note - 1] || ''),
     updated: adminFmt_(r[ADMIN_COL.updated - 1]),
     hist: adminHist_(r[ADMIN_COL.hist - 1]),
-    source: String(r[ADMIN_COL.source - 1] || '')
+    source: String(r[ADMIN_COL.source - 1] || ''),
+    sd: adminSd_(r[ADMIN_COL.sd - 1], r[4])
   };
 }
 
@@ -398,6 +409,8 @@ function adminUpdate_(d) {
   var hasStatus = d.status != null;
   var hasNote = d.note != null;
   if (hasStatus && ADMIN_STATUSES.indexOf(String(d.status)) < 0) return adminOut_({ ok: false, error: 'bad_status' });
+  var edit = adminCleanEdit_(d.edit);
+  if (edit.error) return adminOut_({ ok: false, error: 'bad_field', field: edit.error });
 
   var sheet = adminSheet_();
   var lock = adminLock_();
@@ -437,6 +450,33 @@ function adminUpdate_(d) {
         changed = true;
       }
     }
+    // order data (B name · C city/address · D phone · E product · F quantity · G amount · O SD card)
+    var EDIT_COLS = { name: 1, city: 2, phone: 3, product: 4, qty: 5, total: 6 };
+    var LABELS = { name: 'الاسم', city: 'المدينة / العنوان', phone: 'الهاتف', product: 'المنتج', qty: 'الكمية', total: 'المبلغ', sd: 'بطاقة SD' };
+    var diffs = [];
+    var writeData = false, writeSd = false;
+    Object.keys(EDIT_COLS).forEach(function (k) {
+      if (!(k in edit.v)) return;
+      var idx = EDIT_COLS[k];
+      var before = k === 'qty' ? (parseInt(r[idx], 10) || 1) : k === 'total' ? (parseFloat(String(r[idx]).replace(',', '.')) || 0) : String(r[idx] == null ? '' : r[idx]).trim();
+      if (String(before) === String(edit.v[k])) return;
+      diffs.push(LABELS[k] + ': ' + (before === '' ? '—' : before) + ' ← ' + edit.v[k]);
+      r[idx] = edit.v[k];
+      writeData = true;
+    });
+    if ('sd' in edit.v) {
+      var sdBefore = adminSd_(r[ADMIN_COL.sd - 1], r[4]);
+      var sdCell = String(r[ADMIN_COL.sd - 1] || '').trim();
+      var sdNew = edit.v.sd ? 'نعم' : 'لا';
+      if (sdBefore !== edit.v.sd) diffs.push(LABELS.sd + ': ' + (sdBefore ? 'نعم' : 'لا') + ' ← ' + sdNew);
+      if (sdCell !== sdNew) { r[ADMIN_COL.sd - 1] = sdNew; writeSd = true; }
+    }
+    if (diffs.length) {
+      hist.push({ at: at, note: 'تعديل الطلب — ' + diffs.join(' · ') });
+      changed = true;
+    }
+    if (writeData) sheet.getRange(rowNumber, 2, 1, 6).setValues([[r[1], r[2], r[3], r[4], r[5], r[6]]]);
+    if (writeSd) sheet.getRange(rowNumber, ADMIN_COL.sd).setValue(r[ADMIN_COL.sd - 1]);
     if (writeStatus) sheet.getRange(rowNumber, ADMIN_COL.status).setValue(r[S]);
     if (changed) {
       if (hist.length > 60) hist = hist.slice(-60);
@@ -448,4 +488,39 @@ function adminUpdate_(d) {
   } finally {
     lock.releaseLock();
   }
+}
+
+/** Checks the fields sent by the panel's "تعديل الطلب" form. Returns { v: {...} } or { error: fieldName }. */
+function adminCleanEdit_(e) {
+  var v = {};
+  if (!e || typeof e !== 'object') return { v: v };
+  var text = function (x, max) { return String(x == null ? '' : x).replace(/\s+/g, ' ').trim().slice(0, max); };
+  if (e.name != null) v.name = text(e.name, 120);
+  if (e.city != null) v.city = text(e.city, 300);
+  if (e.product != null) {
+    v.product = text(e.product, 200);
+    if (!v.product) return { error: 'product' };
+  }
+  if (e.phone != null) {
+    var p = String(e.phone).replace(/\D/g, '');
+    if (p.indexOf('212') === 0 && p.length === 12) p = '0' + p.slice(3);
+    if (p.length === 9 && /^[5-7]/.test(p)) p = '0' + p;
+    if (!/^0[5-7]\d{8}$/.test(p)) return { error: 'phone' };
+    v.phone = p;
+  }
+  if (e.qty != null) {
+    var q = parseInt(e.qty, 10);
+    if (isNaN(q) || q < 1 || q > 999) return { error: 'qty' };
+    v.qty = q;
+  }
+  if (e.total != null) {
+    var ts = String(e.total).replace(/[\s\u00a0]/g, '');
+    if (ts.indexOf('.') >= 0 || /^\d{1,3}(,\d{3})+$/.test(ts)) ts = ts.replace(/,/g, ''); // 1,299 or 1,299.50
+    else ts = ts.replace(',', '.');                                                        // 12,5
+    var t = parseFloat(ts);
+    if (isNaN(t) || t < 0 || t > 1000000) return { error: 'total' };
+    v.total = Math.round(t * 100) / 100;
+  }
+  if (e.sd != null) v.sd = e.sd === true || e.sd === 'true' || e.sd === 'نعم' || e.sd === 1;
+  return { v: v };
 }

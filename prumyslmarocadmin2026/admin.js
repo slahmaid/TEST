@@ -50,7 +50,7 @@
   const S = {
     tokens: {}, orders: [], loaded: false, today: '', serverSkew: 0, lastSync: 0, busy: false, storeErr: {},
     period: lsGet(LS_PERIOD) || 'today', store: lsGet(LS_STORE) || 'all', status: 'all', q: '', from: '', to: '', sort: 'new', product: '', page: 0,
-    open: null, pending: {}, seen: readSeen()
+    open: null, editing: null, pending: {}, seen: readSeen(), ver: {}
   };
 
   // ---------- utils ----------
@@ -110,13 +110,17 @@
     // the main store's script must not contain the PE file (and vice versa): order numbers would mix up
     if (store.prefix && d.store && d.store !== store.prefix) throw new ApiError('wrong_store', { got: d.store, want: store.prefix });
     pinged[store.id] = true;
+    S.ver[store.id] = Number(d.version) || 0;
   }
+  // editing orders (name, phone, city, product, quantity, amount, SD card) needs admin-api.gs version 4+
+  const canEdit = (o) => (S.ver[o.store] || 0) >= 4;
   async function api(store, action, extra, key) {
     if (!store || !store.url) throw new ApiError('no_endpoint');
     await ping(store);
     // the first list after an update stamps order numbers and colours column H: give Google more time
     const data = await http(store.url, { method: 'POST', timeout: action === 'list' ? 90000 : 45000, headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(Object.assign({ action: action, key: key != null ? key : S.tokens[store.id] || '' }, extra || {})) });
+    if (data.version) S.ver[store.id] = Number(data.version) || 0;
     if (data.ok !== true) throw new ApiError(data.error || 'unknown', data);
     return data;
   }
@@ -136,6 +140,8 @@
       case 'not_found': return 'الطلب غير موجود في الجدول.';
       case 'busy': return 'السكربت مشغول، أعد المحاولة بعد ثوانٍ.';
       case 'bad_status': return 'الحالة مرفوضة من السكربت.';
+      case 'bad_field': return ({ phone: 'رقم الهاتف غير صحيح (مثال: 0612345678).', qty: 'الكمية يجب أن تكون رقماً من 1 إلى 999.', total: 'المبلغ غير صحيح.', product: 'اسم المنتج مطلوب.' })[d.field] || 'قيمة غير صحيحة.';
+      case 'old_script_edit': return 'تعديل الطلبات يحتاج النسخة الجديدة من admin-api.gs في Google Apps Script (ثم Deploy › New version).';
       case 'no_endpoint': return 'رابط السكربت غير موجود في admin.js (STORES).';
       case 'server': return 'خطأ في سكربت Google: ' + (d.detail || '');
       default: return 'خطأ: ' + (c || 'غير معروف');
@@ -408,14 +414,16 @@
     renderStoreWarn();
   }
   function rowHtml(o) {
-    const acts = (NEXT[o.status] || []).map((a) => '<button type="button" class="qbtn' + (a[2] ? ' x' : '') + '" data-to="' + esc(a[1]) + '"' + (S.pending[o.id] ? ' disabled' : '') + '>' + esc(a[0]) + '</button>').join('');
+    const acts = '<button type="button" class="qbtn e" data-edit title="تعديل الطلب" aria-label="تعديل الطلب ' + esc(o.id) + '">' +
+      '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg><span>تعديل</span></button>' +
+      (NEXT[o.status] || []).map((a) => '<button type="button" class="qbtn' + (a[2] ? ' x' : '') + '" data-to="' + esc(a[1]) + '"' + (S.pending[o.id] ? ' disabled' : '') + '>' + esc(a[0]) + '</button>').join('');
     return '<tr data-id="' + esc(o.id) + '" class="' + (isNew(o) ? 'is-new' : '') + (S.open === o.id ? ' is-open' : '') + '" tabindex="0">' +
       '<td class="c-id"><bdi>' + esc(o.id) + '</bdi>' + (isNew(o) ? '<span class="new-tag">جديد</span>' : '') + '<span class="c-date-m" dir="ltr">' + esc(o.recu) + '</span></td>' +
       '<td class="c-date"><span dir="ltr">' + esc(o.recu) + '</span></td>' +
       '<td class="c-name">' + esc(o.name || '—') + '</td>' +
       '<td class="c-tel"><span dir="ltr">' + esc(o.phone) + '</span></td>' +
       '<td class="c-city">' + esc(o.city || '—') + '</td>' +
-      '<td class="c-art"><span>' + esc(o.product) + (o.qty > 1 ? ' <em>× ' + esc(o.qty) + '</em>' : '') + '</span></td>' +
+      '<td class="c-art"><span>' + esc(o.product) + (o.qty > 1 ? ' <em>× ' + esc(o.qty) + '</em>' : '') + (o.sd ? ' <i class="sd-tag">+ SD</i>' : '') + '</span></td>' +
       '<td class="num c-tot">' + dh(o.total) + '</td>' +
       '<td class="c-st"><span class="pill' + (S.pending[o.id] ? ' pending' : '') + '" data-k="' + SKEY[o.status] + '">' + esc(o.status) + '</span></td>' +
       '<td class="c-act"><span class="qa">' + acts + '</span></td></tr>';
@@ -445,12 +453,12 @@
   }
   function closeDrawer(silent) {
     if (!S.open && el.drawer.hidden) return;
-    S.open = null;
+    S.open = null; S.editing = null;
     el.drawer.hidden = true; el.scrim.hidden = true; document.body.classList.remove('no-scroll');
     if (!silent) { render(); if (lastFocus && document.contains(lastFocus)) lastFocus.focus({ preventScroll: true }); }
   }
   function waText(o) {
-    return 'السلام عليكم ' + (o.name || '') + '، شكراً على طلبك رقم ' + o.id + ' من Prumysl: ' + o.product + (o.qty > 1 ? ' × ' + o.qty : '') +
+    return 'السلام عليكم ' + (o.name || '') + '، شكراً على طلبك رقم ' + o.id + ' من Prumysl: ' + o.product + (o.qty > 1 ? ' × ' + o.qty : '') + (o.sd ? ' + بطاقة ذاكرة SD' : '') +
       ' — المجموع ' + dh(o.total) + ' يُدفع عند الاستلام. هل يمكنك تأكيد الطلب وعنوان التوصيل' + (o.city ? ' في ' + o.city : '') + '؟ شكراً لك!';
   }
   function histHtml(o) {
@@ -462,8 +470,32 @@
       return '<li' + (k ? ' data-k="' + k + '"' : '') + '><span>' + txt + '</span><time dir="ltr">' + esc(x.at || '') + '</time></li>';
     }).join('');
   }
+  function sdRadios(o, name, disabled) {
+    return '<div class="sd-pick" role="radiogroup" aria-label="بطاقة ذاكرة SD">' +
+      [[true, 'نعم، مع بطاقة SD'], [false, 'لا، بدون بطاقة']].map((x) => '<label class="rad' + (o.sd === x[0] ? ' on' : '') + '"><input type="radio" name="' + name + '" value="' + (x[0] ? '1' : '0') + '"' +
+        (o.sd === x[0] ? ' checked' : '') + (disabled ? ' disabled' : '') + '><span>' + x[1] + '</span></label>').join('') + '</div>';
+  }
+  // "تعديل الطلب": name, phone, city / address, product, quantity, amount, SD card
+  function editFormHtml(o) {
+    const products = Array.from(new Set(S.orders.filter((x) => x.store === o.store).map((x) => x.product).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ar'));
+    const fld = (id, label, input, wide) => '<label class="efld' + (wide ? ' wide' : '') + '" for="' + id + '"><span>' + label + '</span>' + input + '</label>';
+    return '<form class="d-card edit-card" id="editForm" novalidate><div class="d-row"><span class="d-h">تعديل الطلب <bdi>' + esc(o.id) + '</bdi></span></div>' +
+      '<div class="egrid">' +
+        fld('edName', 'الاسم', '<input id="edName" maxlength="120" autocomplete="off" value="' + esc(o.name) + '">') +
+        fld('edPhone', 'الهاتف', '<input id="edPhone" dir="ltr" inputmode="tel" maxlength="16" autocomplete="off" value="' + esc(o.phone) + '">') +
+        fld('edCity', 'المدينة / العنوان', '<textarea id="edCity" rows="2" maxlength="300">' + esc(o.city) + '</textarea>', 1) +
+        fld('edProduct', 'المنتج', '<input id="edProduct" list="edProducts" maxlength="200" autocomplete="off" value="' + esc(o.product) + '"><datalist id="edProducts">' +
+          products.map((p) => '<option value="' + esc(p) + '"></option>').join('') + '</datalist>', 1) +
+        fld('edQty', 'الكمية', '<input id="edQty" type="number" min="1" max="999" step="1" inputmode="numeric" dir="ltr" value="' + esc(o.qty) + '">') +
+        fld('edTotal', 'المبلغ الإجمالي (درهم)', '<input id="edTotal" type="number" min="0" step="1" inputmode="decimal" dir="ltr" value="' + esc(o.total) + '">') +
+      '</div>' +
+      '<div class="efld wide"><span>بطاقة ذاكرة SD</span>' + sdRadios(o, 'edSd') + '</div>' +
+      '<p class="edit-err" id="editErr" role="alert" hidden></p>' +
+      '<div class="d-row edit-act"><button type="button" class="btn btn-ghost-d" data-edit-cancel>إلغاء</button><button type="submit" class="btn btn-accent" data-edit-save>حفظ التعديلات</button></div></form>';
+  }
   function renderDrawer(o, fromRefresh) {
-    const ta = el.drawer.querySelector('textarea');
+    if (fromRefresh && S.editing === o.id) return;   // never wipe the edit form while typing
+    const ta = el.drawer.querySelector('#noteTa');
     const editing = fromRefresh && ta && (document.activeElement === ta || ta.value !== ta.defaultValue);
     const draft = editing ? ta.value : null;
     const tel = digits(o.phone);
@@ -479,21 +511,23 @@
       '<div class="d-card"><span class="d-h">الحالة</span><div class="d-status">' +
         STATUSES.map((s) => '<button type="button" class="sbtn' + (s === o.status ? ' on' : '') + '" data-k="' + SKEY[s] + '" data-to="' + esc(s) + '" aria-pressed="' + (s === o.status) + '"' + (S.pending[o.id] ? ' disabled' : '') + '>' + esc(s) + '</button>').join('') +
       '</div></div>' +
-      '<div class="d-card"><span class="d-h">المنتج</span><div class="items">' +
-        '<div class="item"><b>' + esc(o.product || '—') + '</b><b>' + (o.qty > 1 ? '× ' + esc(o.qty) : '') + '</b><span>' + (o.qty > 1 ? 'سعر الوحدة ' + dh(unit) : 'قطعة واحدة') + '</span></div>' +
-      '</div><div class="tots"><div><span>الكمية</span><span>' + esc(o.qty) + '</span></div>' +
+      (S.editing === o.id ? editFormHtml(o) :
+      '<div class="d-card"><div class="d-row"><span class="d-h">المنتج</span><button type="button" class="btn btn-dark btn-sm" data-edit>✎ تعديل الطلب</button></div><div class="items">' +
+        '<div class="item"><b>' + esc(o.product || '—') + (o.sd ? ' <i class="sd-tag">+ SD</i>' : '') + '</b><b>' + (o.qty > 1 ? '× ' + esc(o.qty) : '') + '</b><span>' + (o.qty > 1 ? 'سعر الوحدة ' + dh(unit) : 'قطعة واحدة') + '</span></div>' +
+      '</div><div class="sd-row"><span>بطاقة ذاكرة SD</span>' + sdRadios(o, 'sdQuick', S.pending[o.id]) + '</div>' +
+      '<div class="tots"><div><span>الكمية</span><span>' + esc(o.qty) + '</span></div>' +
         '<div><span>التوصيل</span><span>مجاني</span></div>' +
-        '<div class="grand"><span>المبلغ المطلوب تحصيله</span><span>' + dh(o.total) + '</span></div></div></div>' +
+        '<div class="grand"><span>المبلغ المطلوب تحصيله</span><span>' + dh(o.total) + '</span></div></div></div>') +
       '<div class="d-card note"><div class="d-row"><span class="d-h">ملاحظة داخلية</span><small>' + (o.updated ? 'آخر تحديث <span dir="ltr">' + esc(o.updated) + '</span>' : '') + '</small></div>' +
         '<textarea id="noteTa" maxlength="1000" placeholder="مثال: الاتصال بعد الساعة 6 مساءً، العنوان بالتفصيل…">' + esc(o.note) + '</textarea>' +
         '<div class="d-row"><small>تظهر فقط في لوحة الإدارة وفي عمود Note بالجدول.</small><button type="button" class="btn btn-dark" data-note>حفظ الملاحظة</button></div></div>' +
       '<div class="d-card"><span class="d-h">السجل</span><ul class="hist">' + histHtml(o) + '</ul></div>' +
       '<div class="d-card"><span class="d-h">بيانات السطر في Google Sheet</span><dl class="fields">' +
         [['تاريخ الاستلام', o.recu, 0, 1], ['رقم الطلب', o.id, 0, 1], ['الاسم', o.name || '—'], ['الهاتف', o.phone, 0, 1], ['المدينة', o.city || '—'], ['الكمية', o.qty],
-         ['المنتج', o.product || '—', 1], ['المبلغ (درهم)', o.total, 0, 1], ['المتجر', store ? store.label : '—'], ['المصدر', srcLabel(o.source)], ['رقم السطر', o.row, 0, 1]]
+         ['المنتج', o.product || '—', 1], ['المبلغ (درهم)', o.total, 0, 1], ['بطاقة SD', o.sd ? 'نعم' : 'لا'], ['المتجر', store ? store.label : '—'], ['المصدر', srcLabel(o.source)], ['رقم السطر', o.row, 0, 1]]
           .map((f) => '<div' + (f[2] ? ' class="wide"' : '') + '><dt>' + esc(f[0]) + '</dt><dd' + (f[3] ? ' dir="ltr"' : '') + '>' + esc(f[1]) + '</dd></div>').join('') +
       '</dl></div>';
-    if (draft != null) { const nt = el.drawer.querySelector('textarea'); nt.value = draft; }
+    if (draft != null) { const nt = el.drawer.querySelector('#noteTa'); if (nt) nt.value = draft; }
   }
 
   // ---------- actions ----------
@@ -520,8 +554,80 @@
     }
     render(); const cur = byId(id); if (S.open === id && cur) renderDrawer(cur);
   }
+  // ---------- edit order ----------
+  function startEdit(id) {
+    const o = byId(id); if (!o) return;
+    if (!canEdit(o)) { toast(errText(new ApiError('old_script_edit')), true); return; }
+    if (S.open !== id) openDrawer(id);
+    S.editing = id;
+    renderDrawer(o);
+    const f = el.drawer.querySelector('#editForm');
+    if (f) { f.scrollIntoView({ block: 'start', behavior: 'smooth' }); setTimeout(() => { const n = el.drawer.querySelector('#edName'); if (n) n.focus({ preventScroll: true }); }, 60); }
+  }
+  function cancelEdit() {
+    const o = byId(S.editing); S.editing = null;
+    if (o && S.open === o.id) renderDrawer(o);
+  }
+  function normPhone(p) {
+    let d = digits(p);
+    if (d.startsWith('00')) d = d.slice(2);
+    if (d.startsWith('212') && d.length === 12) d = '0' + d.slice(3);
+    if (d.length === 9 && /^[5-7]/.test(d)) d = '0' + d;
+    return d;
+  }
+  async function sendEdit(o, edit, okMsg) {
+    const d = await api(storeOf(o.store), 'update', { id: o.id, edit: edit });
+    Object.assign(o, d.order, { store: o.store });
+    toast(okMsg + ' · ' + o.id);
+  }
+  async function saveEdit() {
+    const o = byId(S.editing); if (!o) return;
+    const f = el.drawer.querySelector('#editForm'), err = el.drawer.querySelector('#editErr'), btn = f.querySelector('[data-edit-save]');
+    const val = (id) => f.querySelector('#' + id).value;
+    const showErr = (m, id) => { err.hidden = false; err.textContent = m; if (id) f.querySelector('#' + id).focus(); };
+    const v = {
+      name: val('edName').replace(/\s+/g, ' ').trim(), city: val('edCity').replace(/\s+/g, ' ').trim(), phone: normPhone(val('edPhone')),
+      product: val('edProduct').replace(/\s+/g, ' ').trim(), qty: parseInt(val('edQty'), 10), total: parseFloat(String(val('edTotal')).replace(',', '.')),
+      sd: (f.querySelector('input[name="edSd"]:checked') || {}).value === '1'
+    };
+    if (!/^0[5-7]\d{8}$/.test(v.phone)) return showErr(errText(new ApiError('bad_field', { field: 'phone' })), 'edPhone');
+    if (!v.product) return showErr(errText(new ApiError('bad_field', { field: 'product' })), 'edProduct');
+    if (!(v.qty >= 1 && v.qty <= 999)) return showErr(errText(new ApiError('bad_field', { field: 'qty' })), 'edQty');
+    if (!(v.total >= 0 && v.total <= 1000000)) return showErr(errText(new ApiError('bad_field', { field: 'total' })), 'edTotal');
+    const edit = {};
+    Object.keys(v).forEach((k) => { if (String(v[k]) !== String(k === 'sd' ? !!o.sd : o[k] == null ? '' : o[k])) edit[k] = v[k]; });
+    if (!Object.keys(edit).length) { toast('لا توجد تعديلات'); cancelEdit(); return; }
+    err.hidden = true; btn.disabled = true; btn.textContent = 'جارٍ الحفظ…';
+    try {
+      await sendEdit(o, edit, 'تم حفظ تعديلات الطلب');
+      S.editing = null;
+      render(); if (S.open === o.id) renderDrawer(o);
+    } catch (e) {
+      if (isAuthErr(e)) { signOut(errText(e)); return; }
+      btn.disabled = false; btn.textContent = 'حفظ التعديلات';
+      showErr('لم يتم الحفظ. ' + errText(e), e.code === 'bad_field' ? { phone: 'edPhone', qty: 'edQty', total: 'edTotal', product: 'edProduct' }[e.data.field] : null);
+    }
+  }
+  async function setSd(id, on) {
+    const o = byId(id);
+    if (!o || !!o.sd === on || S.pending[id]) return;
+    if (!canEdit(o)) { toast(errText(new ApiError('old_script_edit')), true); renderDrawer(o); return; }
+    const prev = o.sd;
+    S.pending[id] = { to: o.status };
+    o.sd = on; render(); renderDrawer(o);
+    try {
+      await sendEdit(o, { sd: on }, on ? 'تمت إضافة بطاقة SD' : 'تمت إزالة بطاقة SD');
+    } catch (e) {
+      o.sd = prev;
+      toast('لم يتم الحفظ. ' + errText(e), true);
+      if (isAuthErr(e)) { delete S.pending[id]; signOut(errText(e)); return; }
+    }
+    delete S.pending[id];
+    render(); if (S.open === id) renderDrawer(o);
+  }
+
   async function saveNote(id) {
-    const o = byId(id); const ta = el.drawer.querySelector('textarea'); const btn = el.drawer.querySelector('[data-note]');
+    const o = byId(id); const ta = el.drawer.querySelector('#noteTa'); const btn = el.drawer.querySelector('[data-note]');
     if (!o || !ta) return;
     const note = ta.value.trim();
     if (note === (o.note || '')) { toast('لم تتغيّر الملاحظة'); return; }
@@ -553,8 +659,8 @@
   function exportCsv() {
     const list = filtered().list;
     if (!list.length) { toast('لا يوجد ما يُصدَّر', true); return; }
-    const head = ['تاريخ الاستلام', 'رقم الطلب', 'الاسم', 'الهاتف', 'المدينة', 'المنتج', 'الكمية', 'المبلغ (درهم)', 'الحالة', 'ملاحظة داخلية', 'آخر تحديث', 'المصدر', 'المتجر'];
-    const lines = [head].concat(list.map((o) => [o.recu, o.id, o.name, o.phone, o.city, o.product, o.qty, o.total, o.status, o.note, o.updated, srcLabel(o.source), (storeOf(o.store) || {}).label || '']));
+    const head = ['تاريخ الاستلام', 'رقم الطلب', 'الاسم', 'الهاتف', 'المدينة', 'المنتج', 'بطاقة SD', 'الكمية', 'المبلغ (درهم)', 'الحالة', 'ملاحظة داخلية', 'آخر تحديث', 'المصدر', 'المتجر'];
+    const lines = [head].concat(list.map((o) => [o.recu, o.id, o.name, o.phone, o.city, o.product, o.sd ? 'نعم' : 'لا', o.qty, o.total, o.status, o.note, o.updated, srcLabel(o.source), (storeOf(o.store) || {}).label || '']));
     const csv = '﻿' + lines.map((r) => r.map(csvCell).join(';')).join('\r\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -585,6 +691,7 @@
   el.pager.addEventListener('click', (e) => { const b = e.target.closest('[data-pg]'); if (!b) return; S.page += +b.dataset.pg; render(); el.table.scrollIntoView({ block: 'nearest' }); });
   el.rows.addEventListener('click', (e) => {
     const tr = e.target.closest('tr[data-id]'); if (!tr) return;
+    if (e.target.closest('[data-edit]')) { e.stopPropagation(); startEdit(tr.dataset.id); return; }
     const q = e.target.closest('[data-to]');
     if (q) { e.stopPropagation(); setStatus(tr.dataset.id, q.dataset.to); return; }
     openDrawer(tr.dataset.id);
@@ -593,13 +700,21 @@
   el.scrim.addEventListener('click', () => closeDrawer());
   el.drawer.addEventListener('click', (e) => {
     if (e.target.closest('[data-close]')) return closeDrawer();
+    if (e.target.closest('[data-edit-cancel]')) return cancelEdit();
+    if (e.target.closest('[data-edit]') && S.open) return startEdit(S.open);
     const s = e.target.closest('[data-to]'); if (s && S.open) return setStatus(S.open, s.dataset.to);
     if (e.target.closest('[data-note]') && S.open) return saveNote(S.open);
     const c = e.target.closest('[data-copy]'); if (c) return copy(c.dataset.copy);
   });
+  el.drawer.addEventListener('change', (e) => {
+    const r = e.target.closest('input[type="radio"]'); if (!r || !S.open) return;
+    r.closest('.sd-pick').querySelectorAll('.rad').forEach((l) => l.classList.toggle('on', l.contains(r)));
+    if (r.name === 'sdQuick') setSd(S.open, r.value === '1');
+  });
+  el.drawer.addEventListener('submit', (e) => { if (e.target.id === 'editForm') { e.preventDefault(); saveEdit(); } });
   document.addEventListener('keydown', (e) => {
     if (el.app.hidden) return;
-    if (e.key === 'Escape') { if (S.open) { e.preventDefault(); closeDrawer(); } return; }
+    if (e.key === 'Escape') { if (S.editing) { e.preventDefault(); cancelEdit(); } else if (S.open) { e.preventDefault(); closeDrawer(); } return; }
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '');
     if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
     // physical keys, so the shortcuts also work with an Arabic keyboard layout
