@@ -22,10 +22,12 @@
         <span class="logo-chip"><img src="prumysl-logo.svg" alt="Prumysl" width="282" height="100"></span>
         <span class="login-tag">الإدارة</span>
       </div>
-      <h1 class="login-title">إدارة الطلبات</h1>
-      <p class="login-sub">جميع طلبات الموقع: موكا، موكا برو ماكس، الصقر، البروجيكتورات، البانس…</p>
-      <input type="text" name="username" value="admin" autocomplete="username" hidden>
-      <label class="fld"><span>مفتاح الإدارة</span>
+      <h1 class="login-title">إدارة الطلبات والمخزون</h1>
+      <p class="login-sub">الطلبات، المخزون، ومبيعات الرحلة.</p>
+      <label class="fld"><span>اسم المستخدم</span>
+        <input type="text" id="loginUser" name="username" value="admin" autocomplete="username" autocapitalize="none" spellcheck="false" dir="ltr" maxlength="30">
+      </label>
+      <label class="fld"><span>كلمة السر / مفتاح الإدارة</span>
         <input type="password" id="loginKey" name="password" autocomplete="current-password" required minlength="1" spellcheck="false" dir="ltr">
       </label>
       <label class="chk"><input type="checkbox" id="loginRemember"><span>تذكّرني على هذا الجهاز (30 يوماً)</span></label>
@@ -38,7 +40,7 @@
   <div class="adm" id="app" hidden>
     <header class="top">
       <span class="top-logo logo-chip"><img src="prumysl-logo.svg" alt="Prumysl" width="282" height="100"></span>
-      <div class="top-title"><span class="top-tag">الإدارة</span><strong>الطلبات</strong></div>
+      <div class="top-title"><span class="top-tag">الإدارة</span><strong id="topTitle">الطلبات</strong></div>
       <button type="button" class="top-new" id="newBadge" hidden></button>
       <div class="top-sync" id="sync" aria-live="polite"><span class="dot"></span><span id="syncTxt">جارٍ التحميل…</span></div>
       <div class="top-act">
@@ -49,6 +51,9 @@
       </div>
     </header>
 
+    <nav class="vnav" id="viewNav" role="tablist" aria-label="الأقسام" hidden></nav>
+
+    <div class="ordersView" id="ordersView">
     <nav class="stabs" id="storeTabs" role="tablist" aria-label="المتجر"></nav>
 
     <div class="store-warn" id="storeWarn" role="status" hidden></div>
@@ -101,6 +106,10 @@
       </div>
       <div class="pager" id="pager"></div>
     </section>
+    </div>
+
+    <!-- المخزون · مبيعات الرحلة · المنتجات · البائعون (stock.js) -->
+    <div class="stockView" id="stockView" hidden></div>
   </div>
 
   <!-- ============ تفاصيل الطلب ============ -->
@@ -110,5 +119,6 @@
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
   <script src="admin.js"></script>
+  <script src="stock.js"></script>
 </body>
 </html>

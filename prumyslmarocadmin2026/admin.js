@@ -39,18 +39,18 @@
 
   const $ = (s, r) => (r || document).querySelector(s);
   const el = {
-    login: $('#login'), loginForm: $('#loginForm'), loginKey: $('#loginKey'), loginRemember: $('#loginRemember'), loginErr: $('#loginErr'), loginBtn: $('#loginBtn'),
+    login: $('#login'), loginForm: $('#loginForm'), loginUser: $('#loginUser'), loginKey: $('#loginKey'), loginRemember: $('#loginRemember'), loginErr: $('#loginErr'), loginBtn: $('#loginBtn'),
     app: $('#app'), sync: $('#sync'), syncTxt: $('#syncTxt'), refresh: $('#refreshBtn'), logout: $('#logoutBtn'), newBadge: $('#newBadge'),
     period: $('#period'), storeTabs: $('#storeTabs'), kpis: $('#kpis'), chips: $('#chips'), q: $('#q'), from: $('#from'), to: $('#to'), sort: $('#sort'), product: $('#product'),
     reset: $('#resetBtn'), csv: $('#csvBtn'), rows: $('#rows'), empty: $('#empty'), pager: $('#pager'), table: $('#otable'), warn: $('#storeWarn'),
-    drawer: $('#drawer'), scrim: $('#scrim'), toasts: $('#toasts')
+    drawer: $('#drawer'), scrim: $('#scrim'), toasts: $('#toasts'), ordersView: $('#ordersView')
   };
 
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   const S = {
     tokens: {}, orders: [], loaded: false, today: '', serverSkew: 0, lastSync: 0, busy: false, storeErr: {},
     period: lsGet(LS_PERIOD) || 'today', store: lsGet(LS_STORE) || 'all', status: 'all', q: '', from: '', to: '', sort: 'new', product: '', page: 0,
-    open: null, editing: null, pending: {}, seen: readSeen(), ver: {}
+    open: null, editing: null, pending: {}, seen: readSeen(), ver: {}, who: { role: 'admin', user: 'admin', name: 'المدير' }
   };
 
   // ---------- utils ----------
@@ -114,9 +114,17 @@
   }
   // editing orders (name, phone, city, product, quantity, amount, SD card) needs admin-api.gs version 4+
   const canEdit = (o) => (S.ver[o.store] || 0) >= 4;
+  // Scripts before version 5 only understand auth / list / update: anything else would reach their order form
+  // code and be saved as an EMPTY ORDER ROW. So newer actions are never sent to an older script.
+  const BASIC_ACTIONS = ['auth', 'list', 'update'];
   async function api(store, action, extra, key) {
     if (!store || !store.url) throw new ApiError('no_endpoint');
     await ping(store);
+    const oldScript = (S.ver[store.id] || 0) < 5;
+    if (oldScript && (BASIC_ACTIONS.indexOf(action) < 0 || (action === 'auth' && extra && extra.user && extra.user !== 'admin'))) {
+      throw new ApiError('old_script_stock', { version: S.ver[store.id] || 0 });
+    }
+    if (/^sift_/.test(action) && (S.ver[store.id] || 0) < 6) throw new ApiError('old_script_sift', { version: S.ver[store.id] || 0 });
     // the first list after an update stamps order numbers and colours column H: give Google more time
     const data = await http(store.url, { method: 'POST', timeout: action === 'list' ? 90000 : 45000, headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(Object.assign({ action: action, key: key != null ? key : S.tokens[store.id] || '' }, extra || {})) });
@@ -136,6 +144,10 @@
       case 'html': return 'Google يطلب تسجيل الدخول: يجب أن يكون النشر بخيار «Who has access: Anyone».';
       case 'network': return 'لا يوجد اتصال بالإنترنت أو تعذّر الوصول إلى سكربت Google.';
       case 'wrong_store': return 'هذا الرابط يشغّل سكربت متجر آخر (' + d.got + ' بدل ' + d.want + '). في مشروع المتجر الرئيسي ضع all-orders.gs + admin-api.gs فقط، وفي مشروع البانس crimping-pliers-orders.gs + admin-api.gs فقط، ثم أعد النشر.';
+      case 'forbidden': return 'هذا الحساب لا يملك صلاحية هذا الإجراء.';
+      case 'old_script_sift': return 'ربط SIFT يحتاج النسخة الجديدة من سكربت Google (النسخة الحالية ' + (d.version || '?') + '): أضف sift-api.gs والنسخ الجديدة من admin-api.gs وملف الطلبات، ثم Deploy › New version.';
+      case 'sift': return 'SIFT: ' + (d.message || 'خطأ');
+      case 'old_script_stock': return 'المخزون والبائعون يحتاجون تحديث سكربت Google (النسخة الحالية ' + (d.version || '?') + '): أضف stock-api.gs والنسخة الجديدة من admin-api.gs و all-orders.gs في مشروع المتجر الرئيسي، ثم Deploy › New version. لم يُرسَل أي شيء إلى الجدول.';
       case 'timeout': return 'Google لا يستجيب (انتهت المهلة). أعد المحاولة.';
       case 'not_found': return 'الطلب غير موجود في الجدول.';
       case 'busy': return 'السكربت مشغول، أعد المحاولة بعد ثوانٍ.';
@@ -162,7 +174,8 @@
 
   // ---------- session ----------
   // What is stored is one signed, expiring session token per store (12 h, or 30 days with "تذكّرني"), never the key.
-  const isToken = (k) => /^v1\.\d{10}\./.test(k || '');
+  const isToken = (k) => /^v[12]\.\d{10}\./.test(k || '');
+  const LS_WHO = 'prumysl-admin-who';
   function storedTokens() {
     try {
       const v = JSON.parse(sessionStorage.getItem(LS_KEY) || localStorage.getItem(LS_KEY) || 'null');
@@ -171,12 +184,18 @@
   }
   function keepTokens(remember) {
     try {
-      const v = JSON.stringify(S.tokens);
-      sessionStorage.setItem(LS_KEY, v);
-      if (remember) localStorage.setItem(LS_KEY, v); else localStorage.removeItem(LS_KEY);
+      const v = JSON.stringify(S.tokens), w = JSON.stringify(S.who);
+      sessionStorage.setItem(LS_KEY, v); sessionStorage.setItem(LS_WHO, w);
+      if (remember) { localStorage.setItem(LS_KEY, v); localStorage.setItem(LS_WHO, w); } else { localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_WHO); }
     } catch (e) {}
   }
-  function dropTokens() { try { sessionStorage.removeItem(LS_KEY); localStorage.removeItem(LS_KEY); } catch (e) {} }
+  function dropTokens() { try { [LS_KEY, LS_WHO].forEach((k) => { sessionStorage.removeItem(k); localStorage.removeItem(k); }); } catch (e) {} }
+  function storedWho() {
+    try { const v = JSON.parse(sessionStorage.getItem(LS_WHO) || localStorage.getItem(LS_WHO) || 'null'); return v && v.role ? v : null; } catch (e) { return null; }
+  }
+  const isSeller = () => S.who.role === 'seller';
+  // order-confirmer account (e.g. Reda by phone): orders of both stores, no money totals, no stock / settings
+  const isConfirmer = () => S.who.role === 'confirmer';
   const activeStores = () => STORES.filter((s) => S.tokens[s.id]);
 
   function showLogin(msg) {
@@ -187,18 +206,24 @@
     document.title = TITLE;
     setTimeout(() => el.loginKey.focus(), 30);
   }
-  function signOut(msg) { dropTokens(); S.tokens = {}; S.orders = []; S.loaded = false; showLogin(msg); }
+  function signOut(msg) { dropTokens(); S.tokens = {}; S.orders = []; S.loaded = false; S.who = { role: 'admin', user: 'admin', name: 'المدير' }; if (window.PRUMYSL_STOCK) window.PRUMYSL_STOCK.reset(); showLogin(msg); }
   el.loginForm.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const k = el.loginKey.value.trim();
-    if (!k) { el.loginErr.hidden = false; el.loginErr.textContent = 'أدخل مفتاح الإدارة.'; return; }
+    const user = (el.loginUser.value || '').trim().toLowerCase() || 'admin';
+    if (!k) { el.loginErr.hidden = false; el.loginErr.textContent = 'أدخل كلمة السر.'; return; }
     el.loginBtn.disabled = true; el.loginBtn.textContent = 'جارٍ التحقق…'; el.loginErr.hidden = true;
     const remember = el.loginRemember.checked;
-    const results = await Promise.allSettled(STORES.map((s) => api(s, 'auth', { remember: remember }, k)));
+    // a seller (e.g. Ali) only exists in the main store's script: the stock and the trip sales live there
+    const stores = user === 'admin' ? STORES : STORES.slice(0, 1);
+    S.who = { role: 'admin', user: 'admin', name: 'المدير' };
+    const results = await Promise.allSettled(stores.map((s) => api(s, 'auth', { remember: remember, user: user }, k)));
     const tokens = {}, errs = [];
     results.forEach((r, i) => {
-      if (r.status === 'fulfilled' && isToken(r.value.token)) tokens[STORES[i].id] = r.value.token;
-      else errs.push({ store: STORES[i], e: r.status === 'rejected' ? r.reason : new ApiError('bad_reply') });
+      if (r.status === 'fulfilled' && isToken(r.value.token)) {
+        tokens[stores[i].id] = r.value.token;
+        if (stores[i].id === 'main') S.who = { role: r.value.role || 'admin', user: r.value.user || 'admin', name: r.value.name || 'المدير' };
+      } else errs.push({ store: stores[i], e: r.status === 'rejected' ? r.reason : new ApiError('bad_reply') });
     });
     if (!Object.keys(tokens).length) {
       const first = errs.find((x) => isAuthErr(x.e)) || errs[0];
@@ -206,6 +231,15 @@
       el.loginBtn.disabled = false; el.loginBtn.textContent = 'دخول';
       el.loginKey.select();
       return;
+    }
+    // an order-confirmer also confirms the pliers orders: same user name / password in the other stores' scripts
+    if (S.who.role === 'confirmer' && tokens.main) {
+      const others = STORES.slice(1);
+      const more = await Promise.allSettled(others.map((s) => api(s, 'auth', { remember: remember, user: user }, k)));
+      more.forEach((r, i) => {
+        if (r.status === 'fulfilled' && isToken(r.value.token) && r.value.role === 'confirmer') tokens[others[i].id] = r.value.token;
+        else errs.push({ store: others[i], e: r.status === 'rejected' ? r.reason : new ApiError('forbidden') });
+      });
     }
     S.tokens = tokens; S.storeErr = {};
     errs.forEach((x) => { S.storeErr[x.store.id] = errText(x.e); });
@@ -389,8 +423,8 @@
       '<button type="button" class="kpi" data-go="جديد"><i class="kpi-dot" data-k="new"></i><span class="kpi-l">بانتظار التأكيد</span><span class="kpi-v">' + st.toConfirm + '</span><span class="kpi-s">حالة «جديد»</span></button>',
       '<button type="button" class="kpi" data-go="مؤكد"><i class="kpi-dot" data-k="ship"></i><span class="kpi-l">قيد التنفيذ</span><span class="kpi-v">' + st.inProgress + '</span><span class="kpi-s">' + st.by['مؤكد'] + ' مؤكد · ' + st.by['تم الشحن'] + ' تم شحنه</span></button>',
       '<button type="button" class="kpi" data-go="تم التسليم"><i class="kpi-dot" data-k="done"></i><span class="kpi-l">تم التسليم</span><span class="kpi-v">' + st.delivered + '</span><span class="kpi-s">' + closed + ' ملغي / مرتجع</span></button>',
-      '<div class="kpi accent"><span class="kpi-l">مبالغ قيد التحصيل</span><span class="kpi-v">' + num(st.due) + '<small>درهم</small></span><span class="kpi-s">جديد + مؤكد + تم الشحن</span></div>',
-      '<div class="kpi"><span class="kpi-l">المبالغ المحصّلة</span><span class="kpi-v">' + num(st.paid) + '<small>درهم</small></span><span class="kpi-s">الطلبات المسلَّمة</span></div>'
+      isConfirmer() ? '' : '<div class="kpi accent"><span class="kpi-l">مبالغ قيد التحصيل</span><span class="kpi-v">' + num(st.due) + '<small>درهم</small></span><span class="kpi-s">جديد + مؤكد + تم الشحن</span></div>',
+      isConfirmer() ? '' : '<div class="kpi"><span class="kpi-l">المبالغ المحصّلة</span><span class="kpi-v">' + num(st.paid) + '<small>درهم</small></span><span class="kpi-s">الطلبات المسلَّمة</span></div>'
     ].join('');
     const f = filtered();
     const cnt = {}; STATUSES.forEach((s) => (cnt[s] = 0));
@@ -425,7 +459,7 @@
       '<td class="c-city">' + esc(o.city || '—') + '</td>' +
       '<td class="c-art"><span>' + esc(o.product) + (o.qty > 1 ? ' <em>× ' + esc(o.qty) + '</em>' : '') + (o.sd ? ' <i class="sd-tag">+ SD</i>' : '') + '</span></td>' +
       '<td class="num c-tot">' + dh(o.total) + '</td>' +
-      '<td class="c-st"><span class="pill' + (S.pending[o.id] ? ' pending' : '') + '" data-k="' + SKEY[o.status] + '">' + esc(o.status) + '</span></td>' +
+      '<td class="c-st"><span class="pill' + (S.pending[o.id] ? ' pending' : '') + '" data-k="' + SKEY[o.status] + '">' + esc(o.status) + '</span>' + siftMini(o) + '</td>' +
       '<td class="c-act"><span class="qa">' + acts + '</span></td></tr>';
   }
   function renderEmptyError(msg) {
@@ -466,10 +500,46 @@
     h.push({ at: o.recu, by: 'site' });
     return h.map((x) => {
       const k = x.to && SKEY[x.to] ? SKEY[x.to] : '';
-      const txt = x.by === 'site' ? 'تم استلام الطلب من الموقع' + (o.source ? ' (' + esc(srcLabel(o.source)) + ')' : '') : x.note ? esc(x.note) : (x.from ? esc(x.from) + ' ← ' : '') + '<b>' + esc(x.to) + '</b>';
+      const txt = x.by === 'site' ? 'تم استلام الطلب من الموقع' + (o.source ? ' (' + esc(srcLabel(o.source)) + ')' : '') : x.note ? esc(x.note) : (x.from ? esc(x.from) + ' ← ' : '') + '<b>' + esc(x.to) + '</b>' + (x.who ? ' <span class="muted">· ' + esc(x.who) + '</span>' : x.by === 'sift' ? ' <span class="muted">· SIFT</span>' : '');
       return '<li' + (k ? ' data-k="' + k + '"' : '') + '><span>' + txt + '</span><time dir="ltr">' + esc(x.at || '') + '</time></li>';
     }).join('');
   }
+  // ---------- SIFT.ma delivery (sift-api.gs) ----------
+  function siftMini(o) {
+    const s = o.sift;
+    if (!s) return '';
+    if (s.error && !s.tracking) return '<small class="sift-mini err" title="' + esc(s.message || s.error) + '">SIFT ⚠</small>';
+    return '<small class="sift-mini">' + (s.label ? esc(s.label) : 'SIFT') + (s.tracking ? ' · <bdi dir="ltr">' + esc(s.tracking) + '</bdi>' : '') + '</small>';
+  }
+  function siftCard(o) {
+    const s = o.sift;
+    const canSift = (S.ver[o.store] || 0) >= 6;
+    if (!s) {
+      if (!canSift || o.status !== 'مؤكد') return '';
+      return '<div class="d-card sift-card"><div class="d-row"><span class="d-h">التوصيل · SIFT</span><button type="button" class="btn btn-accent btn-sm" data-sift-push>إرسال إلى SIFT</button></div>' +
+        '<small class="muted">لم يُرسل هذا الطلب بعد. الطلبات تُرسل تلقائياً عند «تأكيد».</small></div>';
+    }
+    return '<div class="d-card sift-card' + (s.error && !s.tracking ? ' bad' : '') + '"><div class="d-row"><span class="d-h">التوصيل · SIFT</span>' +
+      (s.label ? '<span class="pill" data-k="' + (s.status === 'delivered' ? 'done' : /return|refused/.test(s.status) ? 'ret' : s.status === 'cancelled' ? 'canc' : 'ship') + '">' + esc(s.label) + '</span>' : '') + '</div>' +
+      (s.tracking ? '<div class="d-row"><span>رقم التتبع</span><span><bdi dir="ltr" class="trk">' + esc(s.tracking) + '</bdi> <button type="button" class="qbtn x" data-copy="' + esc(s.tracking) + '">نسخ</button></span></div>' : '') +
+      (s.error && !s.tracking ? '<p class="edit-err">' + esc(s.message || s.error) + '</p><div class="d-row edit-act"><small class="muted">صحّح المدينة أو الهاتف من «تعديل الطلب» ثم أعد الإرسال.</small><button type="button" class="btn btn-accent btn-sm" data-sift-push>إعادة الإرسال إلى SIFT</button></div>' : '') +
+      '</div>';
+  }
+  async function siftPush(id) {
+    const o = byId(id); if (!o) return;
+    const btn = el.drawer.querySelector('[data-sift-push]'); if (btn) { btn.disabled = true; btn.textContent = 'جارٍ الإرسال…'; }
+    try {
+      const d = await api(storeOf(o.store), 'sift_push', { id: id });
+      Object.assign(o, d.order, { store: o.store });
+      if (o.sift && o.sift.tracking) toast('SIFT · ' + id + ' · رقم التتبع ' + o.sift.tracking);
+      else toast('SIFT · ' + id + ': ' + ((o.sift && o.sift.message) || 'لم يُحجز بعد'), true);
+    } catch (e) {
+      toast(errText(e), true);
+      if (isAuthErr(e)) { signOut(errText(e)); return; }
+    }
+    render(); if (S.open === id) renderDrawer(o);
+  }
+
   function sdRadios(o, name, disabled) {
     return '<div class="sd-pick" role="radiogroup" aria-label="بطاقة ذاكرة SD">' +
       [[true, 'نعم، مع بطاقة SD'], [false, 'لا، بدون بطاقة']].map((x) => '<label class="rad' + (o.sd === x[0] ? ' on' : '') + '"><input type="radio" name="' + name + '" value="' + (x[0] ? '1' : '0') + '"' +
@@ -508,6 +578,7 @@
         '<div class="d-contact"><a class="btn btn-white" href="tel:' + esc(tel) + '">اتصال</a>' +
         '<a class="btn btn-wa" target="_blank" rel="noopener noreferrer" href="https://wa.me/' + esc(wa212(o.phone)) + '?text=' + encodeURIComponent(waText(o)) + '">واتساب</a>' +
         '<button type="button" class="btn btn-ghost" data-copy="' + esc(o.phone) + '">نسخ الرقم</button></div></div>' +
+      siftCard(o) +
       '<div class="d-card"><span class="d-h">الحالة</span><div class="d-status">' +
         STATUSES.map((s) => '<button type="button" class="sbtn' + (s === o.status ? ' on' : '') + '" data-k="' + SKEY[s] + '" data-to="' + esc(s) + '" aria-pressed="' + (s === o.status) + '"' + (S.pending[o.id] ? ' disabled' : '') + '>' + esc(s) + '</button>').join('') +
       '</div></div>' +
@@ -545,6 +616,8 @@
       const cur = byId(id);
       if (cur) Object.assign(cur, d.order, { store: o.store });
       toast(id + ' ← ' + to);
+      if (d.sift && d.sift.tracking) toast('SIFT · ' + id + ' · رقم التتبع ' + d.sift.tracking);
+      else if (d.sift && d.sift.error) toast('SIFT · ' + id + ': ' + d.sift.error, true);
     } catch (e) {
       delete S.pending[id];
       const cur = byId(id);
@@ -687,7 +760,7 @@
   el.product.addEventListener('change', () => { S.product = el.product.value; S.page = 0; render(); });
   el.reset.addEventListener('click', () => { S.q = S.from = S.to = S.product = ''; S.status = 'all'; S.sort = 'new'; S.page = 0; el.q.value = el.from.value = el.to.value = ''; el.sort.value = 'new'; markSeen(); render(); });
   el.csv.addEventListener('click', exportCsv);
-  el.refresh.addEventListener('click', () => load(true));
+  el.refresh.addEventListener('click', () => { if (el.ordersView.hidden && window.PRUMYSL_STOCK) window.PRUMYSL_STOCK.refresh(true); else load(true); });
   el.pager.addEventListener('click', (e) => { const b = e.target.closest('[data-pg]'); if (!b) return; S.page += +b.dataset.pg; render(); el.table.scrollIntoView({ block: 'nearest' }); });
   el.rows.addEventListener('click', (e) => {
     const tr = e.target.closest('tr[data-id]'); if (!tr) return;
@@ -705,6 +778,7 @@
     const s = e.target.closest('[data-to]'); if (s && S.open) return setStatus(S.open, s.dataset.to);
     if (e.target.closest('[data-note]') && S.open) return saveNote(S.open);
     const c = e.target.closest('[data-copy]'); if (c) return copy(c.dataset.copy);
+    if (e.target.closest('[data-sift-push]') && S.open) return siftPush(S.open);
   });
   el.drawer.addEventListener('change', (e) => {
     const r = e.target.closest('input[type="radio"]'); if (!r || !S.open) return;
@@ -713,7 +787,7 @@
   });
   el.drawer.addEventListener('submit', (e) => { if (e.target.id === 'editForm') { e.preventDefault(); saveEdit(); } });
   document.addEventListener('keydown', (e) => {
-    if (el.app.hidden) return;
+    if (el.app.hidden || el.ordersView.hidden) return;
     if (e.key === 'Escape') { if (S.editing) { e.preventDefault(); cancelEdit(); } else if (S.open) { e.preventDefault(); closeDrawer(); } return; }
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '');
     if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -724,20 +798,43 @@
 
   // ---------- auto refresh (new orders from the site appear within 60 s) ----------
   let timer = null;
-  function startTimer() { stopTimer(); timer = setInterval(() => { if (!document.hidden && !el.app.hidden) load(false); }, REFRESH_MS); }
+  function startTimer() { stopTimer(); timer = setInterval(() => { if (!document.hidden && !el.app.hidden && !isSeller()) load(false); }, REFRESH_MS); }
   function stopTimer() { if (timer) clearInterval(timer); timer = null; }
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && !el.app.hidden && activeStores().length && Date.now() - S.lastSync > REFRESH_MS) load(false); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !el.app.hidden && !isSeller() && activeStores().length && Date.now() - S.lastSync > REFRESH_MS) load(false); });
 
   function startApp() {
     el.login.hidden = true; el.app.hidden = false;
+    if (isSeller()) {
+      // a seller never loads the orders: only the trip screen (his sales + the van stock)
+      el.ordersView.hidden = true; el.sync.hidden = true; el.newBadge.hidden = true;
+      if (window.PRUMYSL_STOCK) window.PRUMYSL_STOCK.start();
+      return;
+    }
+    el.sync.hidden = false;
+    el.csv.hidden = isConfirmer();
+    const tag = document.querySelector('.top-tag'); if (tag) tag.textContent = isConfirmer() ? S.who.name : 'الإدارة';
+    if (window.PRUMYSL_STOCK) window.PRUMYSL_STOCK.start();
     if (!S.loaded) skeleton();
     render(); load(false); startTimer();
   }
 
   // ---------- boot ----------
   const saved = storedTokens();
-  STORES.forEach((s) => { if (isToken(saved[s.id])) S.tokens[s.id] = saved[s.id]; });
+  const who = storedWho();
+  if (who) S.who = who;
+  STORES.forEach((s) => { if (isToken(saved[s.id]) && (!isSeller() || s.id === 'main')) S.tokens[s.id] = saved[s.id]; });
   if (activeStores().length) startApp(); else showLogin('');
+
+  // bridge for stock.js (المخزون، مبيعات الرحلة، المنتجات، البائعون)
+  window.PRUMYSL = {
+    api: (action, extra) => api(STORES[0], action, extra), ApiError: ApiError,
+    apiFor: (storeId, action, extra) => api(storeOf(storeId), action, extra), stores: STORES.map((s) => ({ id: s.id, label: s.label })),
+    isConnected: (storeId) => !!S.tokens[storeId], errText: errText, isAuthErr: isAuthErr, signOut: signOut,
+    esc: esc, num: num, dh: dh, toast: toast, dayOf: dayOf, now: now, hm: hm, norm: norm,
+    get who() { return S.who; }, get connected() { return !!S.tokens.main; }, get version() { return S.ver.main || 0; },
+    showOrders: (on) => { el.ordersView.hidden = !on || isSeller(); el.sync.hidden = !on || isSeller(); if (on && !isSeller()) render(); },
+    reloadOrders: () => { if (!isSeller()) load(false); }
+  };
 
   window.__prumyslOrdersAdmin = { get orders() { return S.orders; }, reload: load, stats: stats, filtered: filtered };    // for tests / console
 })();

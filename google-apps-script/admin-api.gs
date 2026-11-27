@@ -10,6 +10,8 @@
  *   H    Order Statut   ← status, updated by the admin panel and coloured like the panel
  *   I    (your own column — never read or written by this script)
  *   J Order ID · K Note · L Updated · M History · N Source · O SD Card (نعم / لا)
+ *   P Stock (what was taken from the depot when the order was shipped — managed by stock-api.gs)
+ *   Q SIFT (SIFT.ma parcel id, tracking number, delivery status — managed by sift-api.gs)
  *
  * Setup (once per Apps Script project) — see ADMIN-SETUP.md:
  *   1. Project Settings › Script properties › add  ADMIN_KEY = <your secret, 8+ characters>
@@ -20,12 +22,17 @@
  * The admin key never leaves Google: the panel stores only a signed, expiring session token.
  */
 
-var ADMIN_API_VERSION = 4; // 4 = order editing (name, phone, city/address, product, quantity, amount, SD card)
-var ADMIN_COL = { status: 8, id: 10, note: 11, updated: 12, hist: 13, source: 14, sd: 15 }; // H, J, K, L, M, N, O
-var ADMIN_TOTAL_COLS = 15; // A..O
+var ADMIN_API_VERSION = 7; // 4 = order editing · 5 = seller logins + stock · 6 = SIFT delivery · 7 = order-confirmer accounts
+// what a seller account (e.g. Ali) may do: his own van sales and the van stock — nothing else
+var ADMIN_SELLER_ACTIONS = ['auth', 'stock_view', 'sale_add', 'sales_list', 'sale_cancel'];
+// what an order-confirmer account (e.g. Reda, confirming by phone) may do: the orders and sending them to SIFT — no totals, stock or settings
+var ADMIN_CONFIRMER_ACTIONS = ['auth', 'list', 'update', 'sift_push'];
+var ADMIN_ROLES = ['seller', 'confirmer'];
+var ADMIN_COL = { status: 8, id: 10, note: 11, updated: 12, hist: 13, source: 14, sd: 15, stock: 16, sift: 17 }; // H, J…P, Q
+var ADMIN_TOTAL_COLS = 17; // A..Q
 var ADMIN_STATUS_HEADER = 'Order Statut';
 var ADMIN_EXTRA_FIRST = 10; // J
-var ADMIN_EXTRA_HEADERS = ['Order ID', 'Note', 'Updated', 'History', 'Source', 'SD Card']; // J..O
+var ADMIN_EXTRA_HEADERS = ['Order ID', 'Note', 'Updated', 'History', 'Source', 'SD Card', 'Stock', 'SIFT']; // J..Q
 // products whose name already says it includes a memory card (when column O is still empty)
 var ADMIN_SD_RE = /carte\s*m[ée]moire|memory\s*card|micro\s*sd|\bsd\b|بطاقة\s*(ال)?ذاكرة|ذاكرة\s*sd/i;
 var ADMIN_STATUSES = ['جديد', 'مؤكد', 'تم الشحن', 'تم التسليم', 'ملغي', 'مرتجع'];
@@ -78,7 +85,7 @@ function isAdminRequest_(e) {
   if (c.charAt(0) !== '{') return false;
   try {
     var d = JSON.parse(c);
-    return !!d && typeof d.action === 'string' && ['auth', 'list', 'update'].indexOf(d.action) >= 0;
+    return !!d && typeof d.action === 'string' && /^[a-z_]{2,30}$/.test(d.action) && 'key' in d;
   } catch (err) {
     return false;
   }
@@ -93,6 +100,8 @@ function adminNewOrderRow_(base, source) {
   row.push('', '', '', '');               // J Order ID (given by the admin API) · K Note · L Updated · M History
   row.push(String(source || '').trim());  // N Source
   row.push('');                           // O SD Card (empty = read from the product name)
+  row.push('');                           // P Stock
+  row.push('');                           // Q SIFT
   return row;
 }
 
@@ -100,11 +109,25 @@ function adminApi_(e) {
   var d;
   try { d = JSON.parse(e.postData.contents); } catch (err) { return adminOut_({ ok: false, error: 'bad_action' }); }
   try {
-    var auth = adminCheck_(d.key);
+    var auth = adminCheck_(d.key, d.user);
     if (!auth.ok) return adminOut_(auth);
-    if (d.action === 'auth') return adminOut_({ ok: true, token: adminMakeToken_(!!d.remember) });
+    // sellers (e.g. Ali on the road trip) only reach the van-sales actions, never the orders or the totals
+    if (auth.role === 'seller' && ADMIN_SELLER_ACTIONS.indexOf(d.action) < 0) return adminOut_({ ok: false, error: 'forbidden' });
+    if (auth.role === 'confirmer' && ADMIN_CONFIRMER_ACTIONS.indexOf(d.action) < 0) return adminOut_({ ok: false, error: 'forbidden' });
+    if (d.action === 'auth') return adminOut_({ ok: true, token: adminMakeToken_(!!d.remember, auth), role: auth.role, user: auth.user, name: auth.name });
     if (d.action === 'list') return adminList_();
-    if (d.action === 'update') return adminUpdate_(d);
+    if (d.action === 'update') return adminUpdate_(d, auth);
+    if (d.action === 'sellers_list') return adminOut_({ ok: true, sellers: adminSellersPublic_() });
+    if (d.action === 'sellers_save') return adminOut_(adminSellerSave_(d));
+    if (d.action === 'sellers_delete') return adminOut_(adminSellerDelete_(d));
+    if (typeof siftApi_ === 'function') {
+      var sr = siftApi_(d, auth);
+      if (sr) return adminOut_(sr);
+    }
+    if (typeof stockApi_ === 'function') {
+      var res = stockApi_(d, auth);
+      if (res) return adminOut_(res);
+    }
     return adminOut_({ ok: false, error: 'bad_action' });
   } catch (err) {
     return adminOut_({ ok: false, error: 'server', detail: String(err && err.message || err) });
@@ -129,42 +152,124 @@ function adminSafeEq_(a, b) {
   return diff === 0;
 }
 
-function adminMakeToken_(remember) {
+/**
+ * Session tokens.  v2.<exp>.<role>.<user>.<ver>.<signature>
+ *   role = admin | seller ; user = seller id (latin letters/digits) ; ver changes when the seller's password
+ *   is changed or the account is switched off, which signs that seller out everywhere.
+ * v1.<exp>.<signature> tokens from earlier versions stay valid for the admin.
+ */
+function adminMakeToken_(remember, auth) {
   var exp = Math.floor(Date.now() / 1000) + (remember ? ADMIN_REMEMBER_DAYS * 86400 : ADMIN_SESSION_HOURS * 3600);
-  var head = 'v1.' + exp;
+  var member = auth && ADMIN_ROLES.indexOf(auth.role) >= 0;
+  var head = 'v2.' + exp + '.' + (member ? auth.role + '.' + auth.user + '.' + auth.ver : 'admin.admin.0');
   return head + '.' + adminSign_(head, adminSecret_());
 }
 
-function adminCheck_(key) {
+function adminFail_(cache, bucket, nowS) {
+  var fk = 'adm_fails' + bucket, lk = 'adm_locked' + bucket;
+  var fails = Number(cache.get(fk) || 0) + 1;
+  if (fails >= ADMIN_MAX_TRIES) {
+    cache.put(lk, String(nowS + ADMIN_LOCK_SECONDS), ADMIN_LOCK_SECONDS);
+    cache.remove(fk);
+    return { ok: false, error: 'locked', retryIn: ADMIN_LOCK_SECONDS };
+  }
+  cache.put(fk, String(fails), ADMIN_LOCK_SECONDS);
+  return { ok: false, error: 'bad_key', left: ADMIN_MAX_TRIES - fails };
+}
+
+function adminCheck_(key, user) {
   var secret = adminSecret_();
   if (!secret) return { ok: false, error: 'no_admin_key', reason: 'missing', min: ADMIN_MIN_KEY };
   if (secret.length < ADMIN_MIN_KEY) return { ok: false, error: 'no_admin_key', reason: 'short', min: ADMIN_MIN_KEY };
 
   var cache = CacheService.getScriptCache();
   var nowS = Math.floor(Date.now() / 1000);
-  var lockedUntil = Number(cache.get('adm_locked') || 0);
-  if (lockedUntil > nowS) return { ok: false, error: 'locked', retryIn: lockedUntil - nowS };
-
   key = String(key || '');
+
+  // --- session tokens ---
+  var m2 = key.match(/^v2\.(\d{10})\.(admin|seller|confirmer)\.([a-z0-9_-]{1,30})\.(\d{1,10})\.([A-Za-z0-9_-]+)$/);
+  if (m2) {
+    var head = key.slice(0, key.lastIndexOf('.'));
+    if (!adminSafeEq_(m2[5], adminSign_(head, secret)) || Number(m2[1]) <= nowS) return { ok: false, error: 'expired' };
+    if (m2[2] === 'admin') return { ok: true, role: 'admin', user: 'admin', name: 'المدير' };
+    var s = adminSellers_()[m2[3]];
+    if (!s || !s.active || String(s.ver) !== m2[4] || (s.role || 'seller') !== m2[2]) return { ok: false, error: 'expired' };
+    return { ok: true, role: s.role || 'seller', user: m2[3], name: s.name, ver: s.ver };
+  }
   if (/^v1\.\d{10}\.[A-Za-z0-9_-]+$/.test(key)) {
     var parts = key.split('.');
-    if (adminSafeEq_(parts[2], adminSign_('v1.' + parts[1], secret)) && Number(parts[1]) > nowS) return { ok: true };
+    if (adminSafeEq_(parts[2], adminSign_('v1.' + parts[1], secret)) && Number(parts[1]) > nowS) return { ok: true, role: 'admin', user: 'admin', name: 'المدير' };
     return { ok: false, error: 'expired' }; // expired, or ADMIN_KEY was changed (signs every device out)
   }
 
-  if (key && adminSafeEq_(key, secret)) {
-    cache.remove('adm_fails');
-    return { ok: true };
+  // --- login with user name + password ---
+  var uid = String(user || '').trim().toLowerCase();
+  if (!uid || uid === 'admin') {
+    var lockedUntil = Number(cache.get('adm_locked') || 0);
+    if (lockedUntil > nowS) return { ok: false, error: 'locked', retryIn: lockedUntil - nowS };
+    if (key && adminSafeEq_(key, secret)) { cache.remove('adm_fails'); return { ok: true, role: 'admin', user: 'admin', name: 'المدير' }; }
+    return adminFail_(cache, '', nowS);
   }
+  if (!/^[a-z0-9_-]{2,30}$/.test(uid)) return { ok: false, error: 'bad_key' };
+  var bucket = '_' + uid;
+  var sl = Number(cache.get('adm_locked' + bucket) || 0);
+  if (sl > nowS) return { ok: false, error: 'locked', retryIn: sl - nowS };
+  var seller = adminSellers_()[uid];
+  if (seller && seller.active && key && adminSafeEq_(adminHash_(seller.salt, key), seller.hash)) {
+    cache.remove('adm_fails' + bucket);
+    return { ok: true, role: seller.role || 'seller', user: uid, name: seller.name, ver: seller.ver };
+  }
+  return adminFail_(cache, bucket, nowS);
+}
 
-  var fails = Number(cache.get('adm_fails') || 0) + 1;
-  if (fails >= ADMIN_MAX_TRIES) {
-    cache.put('adm_locked', String(nowS + ADMIN_LOCK_SECONDS), ADMIN_LOCK_SECONDS);
-    cache.remove('adm_fails');
-    return { ok: false, error: 'locked', retryIn: ADMIN_LOCK_SECONDS };
+// ---------- seller accounts (managed by the admin from the panel › البائعون) ----------
+// Stored in the script property SELLERS as JSON { id: { name, role, salt, hash, ver, active } } — passwords are only kept hashed.
+// role: 'seller' (road-trip sales, van stock) or 'confirmer' (orders by phone, no totals).
+function adminSellers_() {
+  try { var v = JSON.parse(PropertiesService.getScriptProperties().getProperty('SELLERS') || '{}'); return v && typeof v === 'object' ? v : {}; } catch (err) { return {}; }
+}
+function adminSaveSellers_(all) {
+  PropertiesService.getScriptProperties().setProperty('SELLERS', JSON.stringify(all));
+}
+function adminHash_(salt, pw) {
+  var raw = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(salt) + '|' + String(pw), Utilities.Charset.UTF_8);
+  return Utilities.base64EncodeWebSafe(raw).replace(/=+$/, '');
+}
+function adminSellersPublic_() {
+  var all = adminSellers_();
+  return Object.keys(all).sort().map(function (id) { return { id: id, name: all[id].name, role: all[id].role || 'seller', active: !!all[id].active }; });
+}
+function adminSellerSave_(d) {
+  var id = String(d.id || '').trim().toLowerCase();
+  if (!/^[a-z0-9_-]{2,30}$/.test(id) || id === 'admin') return { ok: false, error: 'bad_field', field: 'seller_id' };
+  var name = String(d.name == null ? '' : d.name).replace(/\s+/g, ' ').trim().slice(0, 40);
+  var all = adminSellers_();
+  var s = all[id];
+  var pw = d.password == null ? '' : String(d.password);
+  if (!s && pw.length < 6) return { ok: false, error: 'bad_field', field: 'password' };
+  if (pw && pw.length < 6) return { ok: false, error: 'bad_field', field: 'password' };
+  if (!s) s = { name: name || id, role: 'seller', salt: '', hash: '', ver: 1, active: true };
+  if (name) s.name = name;
+  if (d.role != null) {
+    if (ADMIN_ROLES.indexOf(String(d.role)) < 0) return { ok: false, error: 'bad_field', field: 'role' };
+    if ((s.role || 'seller') !== String(d.role)) { s.role = String(d.role); s.ver = Number(s.ver || 0) + 1; }
   }
-  cache.put('adm_fails', String(fails), ADMIN_LOCK_SECONDS);
-  return { ok: false, error: 'bad_key', left: ADMIN_MAX_TRIES - fails };
+  if (pw) { s.salt = Utilities.getUuid(); s.hash = adminHash_(s.salt, pw); s.ver = Number(s.ver || 0) + 1; }
+  if (d.active != null) {
+    var act = d.active === true || d.active === 'true';
+    if (act !== !!s.active) { s.active = act; s.ver = Number(s.ver || 0) + 1; }
+  }
+  all[id] = s;
+  adminSaveSellers_(all);
+  return { ok: true, sellers: adminSellersPublic_() };
+}
+function adminSellerDelete_(d) {
+  var id = String(d.id || '').trim().toLowerCase();
+  var all = adminSellers_();
+  if (!all[id]) return { ok: false, error: 'not_found' };
+  delete all[id];
+  adminSaveSellers_(all);
+  return { ok: true, sellers: adminSellersPublic_() };
 }
 
 // ---------- sheet ----------
@@ -354,7 +459,16 @@ function adminRowToOrder_(r, rowNumber) {
     updated: adminFmt_(r[ADMIN_COL.updated - 1]),
     hist: adminHist_(r[ADMIN_COL.hist - 1]),
     source: String(r[ADMIN_COL.source - 1] || ''),
-    sd: adminSd_(r[ADMIN_COL.sd - 1], r[4])
+    sd: adminSd_(r[ADMIN_COL.sd - 1], r[4]),
+    stock: (function () { try { return (JSON.parse(r[ADMIN_COL.stock - 1] || '{}') || {}).state || ''; } catch (err) { return ''; } })(),
+    sift: (function () {
+      try {
+        var s = JSON.parse(r[ADMIN_COL.sift - 1] || 'null');
+        if (!s || typeof s !== 'object') return null;
+        return { tracking: s.tracking || '', status: s.status || '', label: (typeof SIFT_LABELS !== 'undefined' && SIFT_LABELS[s.status]) || s.status || '',
+          state: s.state || '', error: s.error || '', message: s.error && typeof siftErrText_ === 'function' ? siftErrText_(s.error, s.message) : '' };
+      } catch (err) { return null; }
+    })()
   };
 }
 
@@ -403,7 +517,8 @@ function adminList_() {
   return adminOut_({ ok: true, now: Date.now(), today: today, orders: orders });
 }
 
-function adminUpdate_(d) {
+function adminUpdate_(d, auth) {
+  var who = auth && auth.role !== 'admin' ? auth.name : '';
   var id = String(d.id || '').trim();
   if (!id) return adminOut_({ ok: false, error: 'not_found' });
   var hasStatus = d.status != null;
@@ -434,7 +549,7 @@ function adminUpdate_(d) {
     var writeStatus = false;
 
     if (hasStatus && String(d.status) !== cur) {
-      hist.push({ at: at, from: cur, to: String(d.status) });
+      hist.push(who ? { at: at, from: cur, to: String(d.status), who: who } : { at: at, from: cur, to: String(d.status) });
       r[S] = String(d.status);
       writeStatus = changed = true;
     } else if (String(r[S] || '').trim() !== cur) {
@@ -445,7 +560,7 @@ function adminUpdate_(d) {
     if (hasNote) {
       var note = String(d.note).slice(0, 1000).trim();
       if (note !== String(r[N] || '')) {
-        hist.push({ at: at, note: note ? 'تعديل الملاحظة الداخلية' : 'حذف الملاحظة الداخلية' });
+        hist.push({ at: at, note: (note ? 'تعديل الملاحظة الداخلية' : 'حذف الملاحظة الداخلية') + (who ? ' — ' + who : '') });
         r[N] = note;
         changed = true;
       }
@@ -472,19 +587,39 @@ function adminUpdate_(d) {
       if (sdCell !== sdNew) { r[ADMIN_COL.sd - 1] = sdNew; writeSd = true; }
     }
     if (diffs.length) {
-      hist.push({ at: at, note: 'تعديل الطلب — ' + diffs.join(' · ') });
+      hist.push({ at: at, note: 'تعديل الطلب' + (who ? ' (' + who + ')' : '') + ' — ' + diffs.join(' · ') });
       changed = true;
     }
     if (writeData) sheet.getRange(rowNumber, 2, 1, 6).setValues([[r[1], r[2], r[3], r[4], r[5], r[6]]]);
     if (writeSd) sheet.getRange(rowNumber, ADMIN_COL.sd).setValue(r[ADMIN_COL.sd - 1]);
     if (writeStatus) sheet.getRange(rowNumber, ADMIN_COL.status).setValue(r[S]);
+    // stock: shipped / delivered online orders leave the depot, cancelled / returned ones come back (stock-api.gs)
+    if (hasStatus && typeof stockOrderHook_ === 'function') {
+      var sk = stockOrderHook_(r, String(r[S]), at);
+      if (sk) {
+        r[ADMIN_COL.stock - 1] = sk.cell;
+        sheet.getRange(rowNumber, ADMIN_COL.stock).setValue(sk.cell);
+        if (sk.note) { hist.push({ at: at, note: sk.note }); changed = true; }
+      }
+    }
+    // SIFT.ma: « مؤكد » creates and books the parcel, « ملغي » before pickup cancels it there (sift-api.gs)
+    var siftResult = null;
+    if (hasStatus && writeStatus && typeof siftOrderHook_ === 'function') {
+      var sf = siftOrderHook_(r, String(r[S]));
+      if (sf) {
+        r[ADMIN_COL.sift - 1] = sf.cell;
+        sheet.getRange(rowNumber, ADMIN_COL.sift).setValue(sf.cell);
+        if (sf.note) { hist.push({ at: at, note: sf.note }); changed = true; }
+        siftResult = sf.sift;
+      }
+    }
     if (changed) {
       if (hist.length > 60) hist = hist.slice(-60);
       r[U] = at;
       r[Hh] = JSON.stringify(hist);
       sheet.getRange(rowNumber, ADMIN_COL.note, 1, 3).setValues([[r[N], r[U], r[Hh]]]);
     }
-    return adminOut_({ ok: true, order: adminRowToOrder_(r, rowNumber) });
+    return adminOut_({ ok: true, order: adminRowToOrder_(r, rowNumber), sift: siftResult ? { tracking: siftResult.tracking || '', error: siftResult.error ? siftErrText_(siftResult.error, siftResult.message) : '' } : null });
   } finally {
     lock.releaseLock();
   }
@@ -523,4 +658,45 @@ function adminCleanEdit_(e) {
   }
   if (e.sd != null) v.sd = e.sd === true || e.sd === 'true' || e.sd === 'نعم' || e.sd === 1;
   return { v: v };
+}
+
+// ---------- one-time cleanup (run by hand from the Apps Script editor) ----------
+/**
+ * Empty rows = no Name (B), City (C), Phone (D), Product (E), Price (G) and no Note (K).
+ * They were created on 26/11/2026 when the new admin panel sent stock requests to the previous script version.
+ *   1. Run previewEmptyOrderRows  → View › Logs shows the rows it would delete (nothing is changed).
+ *   2. Run removeEmptyOrderRows   → deletes exactly those rows.
+ */
+function adminEmptyRows_() {
+  var sheet = getOrdersSheet_();
+  var last = sheet.getLastRow();
+  if (last <= 1) return { sheet: sheet, rows: [] };
+  var values = sheet.getRange(2, 1, last - 1, Math.max(ADMIN_COL.note, Math.min(sheet.getLastColumn(), ADMIN_TOTAL_COLS))).getValues();
+  var blank = function (v) { return String(v == null ? '' : v).trim() === ''; };
+  var rows = [];
+  values.forEach(function (r, i) {
+    if (blank(r[1]) && blank(r[2]) && blank(r[3]) && blank(r[4]) && blank(r[6]) && blank(r[ADMIN_COL.note - 1])) {
+      rows.push({ row: i + 2, date: r[0] instanceof Date ? Utilities.formatDate(r[0], ADMIN_TZ, 'dd/MM/yyyy HH:mm:ss') : String(r[0] || ''), id: String(r[ADMIN_COL.id - 1] || '') });
+    }
+  });
+  return { sheet: sheet, rows: rows };
+}
+function previewEmptyOrderRows() {
+  var res = adminEmptyRows_();
+  res.rows.forEach(function (x) { Logger.log('row ' + x.row + ' · ' + x.date + (x.id ? ' · ' + x.id : '')); });
+  Logger.log(res.rows.length + ' empty row(s) would be deleted. Nothing was changed.');
+  return res.rows.length;
+}
+function removeEmptyOrderRows() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) throw new Error('Busy, try again in a few seconds.');
+  try {
+    var res = adminEmptyRows_();
+    // bottom-up so the row numbers above stay valid
+    res.rows.slice().reverse().forEach(function (x) { res.sheet.deleteRow(x.row); });
+    Logger.log(res.rows.length + ' empty row(s) deleted.');
+    return res.rows.length;
+  } finally {
+    lock.releaseLock();
+  }
 }
