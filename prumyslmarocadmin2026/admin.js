@@ -29,7 +29,8 @@
   };
   const SOURCES = {
     moka: 'صفحة موكا', 'moka-pro-max': 'صفحة موكا برو ماكس', saqr: 'صفحة الصقر', 'guard-corps': 'صفحة GUARD CORPS',
-    projectors: 'صفحة البروجيكتورات', PE: 'صفحة البانس', website: 'الموقع'
+    projectors: 'صفحة البروجيكتورات', PE: 'صفحة البانس', website: 'الموقع',
+    'manual-whatsapp': 'طلب يدوي · واتساب', 'manual-phone': 'طلب يدوي · هاتف', 'manual-shop': 'طلب يدوي · المحل', 'manual-other': 'طلب يدوي'
   };
   const TZ = 'Africa/Casablanca';
   const PAGE = 50;
@@ -42,7 +43,7 @@
     login: $('#login'), loginForm: $('#loginForm'), loginUser: $('#loginUser'), loginKey: $('#loginKey'), loginRemember: $('#loginRemember'), loginErr: $('#loginErr'), loginBtn: $('#loginBtn'),
     app: $('#app'), sync: $('#sync'), syncTxt: $('#syncTxt'), refresh: $('#refreshBtn'), logout: $('#logoutBtn'), newBadge: $('#newBadge'),
     period: $('#period'), storeTabs: $('#storeTabs'), kpis: $('#kpis'), chips: $('#chips'), q: $('#q'), from: $('#from'), to: $('#to'), sort: $('#sort'), product: $('#product'),
-    reset: $('#resetBtn'), csv: $('#csvBtn'), rows: $('#rows'), empty: $('#empty'), pager: $('#pager'), table: $('#otable'), warn: $('#storeWarn'),
+    reset: $('#resetBtn'), csv: $('#csvBtn'), manual: $('#manualBtn'), rows: $('#rows'), empty: $('#empty'), pager: $('#pager'), table: $('#otable'), warn: $('#storeWarn'),
     drawer: $('#drawer'), scrim: $('#scrim'), toasts: $('#toasts'), ordersView: $('#ordersView')
   };
 
@@ -125,10 +126,15 @@
       throw new ApiError('old_script_stock', { version: S.ver[store.id] || 0 });
     }
     if (/^sift_/.test(action) && (S.ver[store.id] || 0) < 6) throw new ApiError('old_script_sift', { version: S.ver[store.id] || 0 });
+    if (action === 'order_add' && (S.ver[store.id] || 0) < 8) throw new ApiError('old_script_manual', { version: S.ver[store.id] || 0 });
     // the first list after an update stamps order numbers and colours column H: give Google more time
     const data = await http(store.url, { method: 'POST', timeout: action === 'list' ? 90000 : 45000, headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(Object.assign({ action: action, key: key != null ? key : S.tokens[store.id] || '' }, extra || {})) });
     if (data.version) S.ver[store.id] = Number(data.version) || 0;
+    // permissions changed by the admin take effect without a new login
+    if (data.perms && store.id === 'main' && S.who.role !== 'admin' && action !== 'auth' && JSON.stringify(data.perms) !== JSON.stringify(S.who.perms || [])) {
+      S.who.perms = data.perms; keepTokens(!!lsGet(LS_KEY)); applyPerms();
+    }
     if (data.ok !== true) throw new ApiError(data.error || 'unknown', data);
     return data;
   }
@@ -145,6 +151,7 @@
       case 'network': return 'لا يوجد اتصال بالإنترنت أو تعذّر الوصول إلى سكربت Google.';
       case 'wrong_store': return 'هذا الرابط يشغّل سكربت متجر آخر (' + d.got + ' بدل ' + d.want + '). في مشروع المتجر الرئيسي ضع all-orders.gs + admin-api.gs فقط، وفي مشروع البانس crimping-pliers-orders.gs + admin-api.gs فقط، ثم أعد النشر.';
       case 'forbidden': return 'هذا الحساب لا يملك صلاحية هذا الإجراء.';
+      case 'old_script_manual': return 'الطلب اليدوي يحتاج النسخة الجديدة من admin-api.gs في Google Apps Script (ثم Deploy › New version).';
       case 'old_script_sift': return 'ربط SIFT يحتاج النسخة الجديدة من سكربت Google (النسخة الحالية ' + (d.version || '?') + '): أضف sift-api.gs والنسخ الجديدة من admin-api.gs وملف الطلبات، ثم Deploy › New version.';
       case 'sift': return 'SIFT: ' + (d.message || 'خطأ');
       case 'old_script_stock': return 'المخزون والبائعون يحتاجون تحديث سكربت Google (النسخة الحالية ' + (d.version || '?') + '): أضف stock-api.gs والنسخة الجديدة من admin-api.gs و all-orders.gs في مشروع المتجر الرئيسي، ثم Deploy › New version. لم يُرسَل أي شيء إلى الجدول.';
@@ -193,9 +200,17 @@
   function storedWho() {
     try { const v = JSON.parse(sessionStorage.getItem(LS_WHO) || localStorage.getItem(LS_WHO) || 'null'); return v && v.role ? v : null; } catch (e) { return null; }
   }
-  const isSeller = () => S.who.role === 'seller';
-  // order-confirmer account (e.g. Reda by phone): orders of both stores, no money totals, no stock / settings
-  const isConfirmer = () => S.who.role === 'confirmer';
+  // permissions ticked by the admin in « البائعون » (the admin has them all)
+  const can = (p) => S.who.role === 'admin' || (S.who.perms || []).indexOf(p) >= 0;
+  const isSeller = () => !can('orders');            // no orders screen for this account
+  const noMoney = () => !can('orders_money');       // no money totals / CSV
+  function applyPerms() {
+    if (el.app.hidden) return;
+    el.manual.hidden = !can('orders_add');
+    el.csv.hidden = noMoney();
+    if (window.PRUMYSL_STOCK) window.PRUMYSL_STOCK.perms();
+    if (!isSeller()) render();
+  }
   const activeStores = () => STORES.filter((s) => S.tokens[s.id]);
 
   function showLogin(msg) {
@@ -222,7 +237,7 @@
     results.forEach((r, i) => {
       if (r.status === 'fulfilled' && isToken(r.value.token)) {
         tokens[stores[i].id] = r.value.token;
-        if (stores[i].id === 'main') S.who = { role: r.value.role || 'admin', user: r.value.user || 'admin', name: r.value.name || 'المدير' };
+        if (stores[i].id === 'main') S.who = { role: r.value.role || 'admin', user: r.value.user || 'admin', name: r.value.name || 'المدير', perms: r.value.perms || [] };
       } else errs.push({ store: stores[i], e: r.status === 'rejected' ? r.reason : new ApiError('bad_reply') });
     });
     if (!Object.keys(tokens).length) {
@@ -233,11 +248,11 @@
       return;
     }
     // an order-confirmer also confirms the pliers orders: same user name / password in the other stores' scripts
-    if (S.who.role === 'confirmer' && tokens.main) {
+    if (S.who.role !== 'admin' && (can('orders') || can('orders_add')) && tokens.main) {
       const others = STORES.slice(1);
       const more = await Promise.allSettled(others.map((s) => api(s, 'auth', { remember: remember, user: user }, k)));
       more.forEach((r, i) => {
-        if (r.status === 'fulfilled' && isToken(r.value.token) && r.value.role === 'confirmer') tokens[others[i].id] = r.value.token;
+        if (r.status === 'fulfilled' && isToken(r.value.token) && r.value.role !== 'admin') tokens[others[i].id] = r.value.token;
         else errs.push({ store: others[i], e: r.status === 'rejected' ? r.reason : new ApiError('forbidden') });
       });
     }
@@ -423,8 +438,8 @@
       '<button type="button" class="kpi" data-go="جديد"><i class="kpi-dot" data-k="new"></i><span class="kpi-l">بانتظار التأكيد</span><span class="kpi-v">' + st.toConfirm + '</span><span class="kpi-s">حالة «جديد»</span></button>',
       '<button type="button" class="kpi" data-go="مؤكد"><i class="kpi-dot" data-k="ship"></i><span class="kpi-l">قيد التنفيذ</span><span class="kpi-v">' + st.inProgress + '</span><span class="kpi-s">' + st.by['مؤكد'] + ' مؤكد · ' + st.by['تم الشحن'] + ' تم شحنه</span></button>',
       '<button type="button" class="kpi" data-go="تم التسليم"><i class="kpi-dot" data-k="done"></i><span class="kpi-l">تم التسليم</span><span class="kpi-v">' + st.delivered + '</span><span class="kpi-s">' + closed + ' ملغي / مرتجع</span></button>',
-      isConfirmer() ? '' : '<div class="kpi accent"><span class="kpi-l">مبالغ قيد التحصيل</span><span class="kpi-v">' + num(st.due) + '<small>درهم</small></span><span class="kpi-s">جديد + مؤكد + تم الشحن</span></div>',
-      isConfirmer() ? '' : '<div class="kpi"><span class="kpi-l">المبالغ المحصّلة</span><span class="kpi-v">' + num(st.paid) + '<small>درهم</small></span><span class="kpi-s">الطلبات المسلَّمة</span></div>'
+      noMoney() ? '' : '<div class="kpi accent"><span class="kpi-l">مبالغ قيد التحصيل</span><span class="kpi-v">' + num(st.due) + '<small>درهم</small></span><span class="kpi-s">جديد + مؤكد + تم الشحن</span></div>',
+      noMoney() ? '' : '<div class="kpi"><span class="kpi-l">المبالغ المحصّلة</span><span class="kpi-v">' + num(st.paid) + '<small>درهم</small></span><span class="kpi-s">الطلبات المسلَّمة</span></div>'
     ].join('');
     const f = filtered();
     const cnt = {}; STATUSES.forEach((s) => (cnt[s] = 0));
@@ -504,6 +519,67 @@
       return '<li' + (k ? ' data-k="' + k + '"' : '') + '><span>' + txt + '</span><time dir="ltr">' + esc(x.at || '') + '</time></li>';
     }).join('');
   }
+  // ---------- manual order (WhatsApp / phone / shop) ----------
+  function manualFormHtml() {
+    const stores = STORES.filter((s) => S.tokens[s.id]);
+    const products = Array.from(new Set(S.orders.map((x) => x.product).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ar'));
+    const fld = (id, label, input, wide) => '<label class="efld' + (wide ? ' wide' : '') + '" for="' + id + '"><span>' + label + '</span>' + input + '</label>';
+    return '<form class="d-card edit-card" id="manualForm" novalidate><div class="d-row"><span class="d-h">طلب يدوي جديد</span><button type="button" class="d-close dark" data-close aria-label="إغلاق">✕</button></div>' +
+      '<div class="egrid">' +
+        (stores.length > 1 ? fld('mStore', 'المتجر', '<select id="mStore">' + stores.map((s) => '<option value="' + s.id + '">' + esc(s.label) + '</option>').join('') + '</select>', 1) : '') +
+        fld('mName', 'الاسم', '<input id="mName" maxlength="120" autocomplete="off">') +
+        fld('mPhone', 'الهاتف *', '<input id="mPhone" dir="ltr" inputmode="tel" maxlength="16" autocomplete="off" placeholder="06XXXXXXXX">') +
+        fld('mCity', 'المدينة / العنوان', '<textarea id="mCity" rows="2" maxlength="300"></textarea>', 1) +
+        fld('mProduct', 'المنتج *', '<input id="mProduct" list="mProducts" maxlength="200" autocomplete="off"><datalist id="mProducts">' + products.map((p) => '<option value="' + esc(p) + '"></option>').join('') + '</datalist>', 1) +
+        fld('mQty', 'الكمية', '<input id="mQty" type="number" min="1" max="999" step="1" value="1" inputmode="numeric" dir="ltr">') +
+        fld('mTotal', 'المبلغ الإجمالي (درهم) *', '<input id="mTotal" type="number" min="0" step="1" inputmode="decimal" dir="ltr">') +
+        fld('mSource', 'مصدر الطلب', '<select id="mSource"><option value="whatsapp">واتساب</option><option value="phone">هاتف</option><option value="shop">المحل</option><option value="other">آخر</option></select>') +
+        fld('mStatus', 'الحالة', '<select id="mStatus"><option value="مؤكد">مؤكد — يُرسل إلى SIFT مباشرة</option><option value="جديد">جديد — للتأكيد لاحقاً</option></select>') +
+      '</div>' +
+      '<div class="efld wide"><span>بطاقة ذاكرة SD</span>' + sdRadios({ sd: false }, 'mSd') + '</div>' +
+      fld('mNote', 'ملاحظة داخلية (اختياري)', '<textarea id="mNote" rows="2" maxlength="1000"></textarea>', 1) +
+      '<p class="edit-err" id="manualErr" role="alert" hidden></p>' +
+      '<div class="d-row edit-act"><button type="button" class="btn btn-ghost-d" data-close>إلغاء</button><button type="submit" class="btn btn-accent" id="manualSave">حفظ الطلب</button></div></form>';
+  }
+  function openManual() {
+    if (!can('orders_add')) return;
+    if (!S.open) lastFocus = document.activeElement;
+    S.open = null; S.editing = null;
+    el.drawer.innerHTML = manualFormHtml();
+    el.drawer.hidden = false; el.scrim.hidden = false; document.body.classList.add('no-scroll');
+    el.drawer.scrollTop = 0;
+    setTimeout(() => { const n = el.drawer.querySelector('#mName'); if (n) n.focus(); }, 60);
+  }
+  async function saveManual(f) {
+    const v = (id) => (f.querySelector('#' + id) || {}).value || '';
+    const errEl = f.querySelector('#manualErr'), btn = f.querySelector('#manualSave');
+    const showErr = (m, id) => { errEl.hidden = false; errEl.textContent = m; if (id) f.querySelector('#' + id).focus(); };
+    const phone = normPhone(v('mPhone'));
+    const qty = parseInt(v('mQty'), 10) || 1;
+    const total = parseFloat(String(v('mTotal')).replace(',', '.'));
+    if (!/^0[5-7]\d{8}$/.test(phone)) return showErr(errText(new ApiError('bad_field', { field: 'phone' })), 'mPhone');
+    if (!v('mProduct').trim()) return showErr(errText(new ApiError('bad_field', { field: 'product' })), 'mProduct');
+    if (!(qty >= 1 && qty <= 999)) return showErr(errText(new ApiError('bad_field', { field: 'qty' })), 'mQty');
+    if (!(total >= 0)) return showErr(errText(new ApiError('bad_field', { field: 'total' })), 'mTotal');
+    const storeId = v('mStore') || STORES.find((s) => S.tokens[s.id]).id;
+    errEl.hidden = true; btn.disabled = true; btn.textContent = 'جارٍ الحفظ…';
+    try {
+      const d = await api(storeOf(storeId), 'order_add', {
+        name: v('mName').trim(), phone: phone, city: v('mCity').replace(/\s+/g, ' ').trim(), product: v('mProduct').replace(/\s+/g, ' ').trim(),
+        qty: qty, total: total, sd: (f.querySelector('input[name="mSd"]:checked') || {}).value === '1',
+        source: v('mSource'), status: v('mStatus'), note: v('mNote').trim()
+      });
+      toast('تمت إضافة الطلب ' + ((d.order && d.order.id) || ''));
+      if (d.sift && d.sift.tracking) toast('SIFT · رقم التتبع ' + d.sift.tracking);
+      else if (d.sift && d.sift.error) toast('SIFT: ' + d.sift.error, true);
+      closeDrawer(); load(false);
+    } catch (e) {
+      if (isAuthErr(e)) { signOut(errText(e)); return; }
+      btn.disabled = false; btn.textContent = 'حفظ الطلب';
+      showErr('لم يُحفظ الطلب. ' + errText(e), e.code === 'bad_field' ? { phone: 'mPhone', qty: 'mQty', total: 'mTotal', product: 'mProduct' }[e.data.field] : null);
+    }
+  }
+
   // ---------- SIFT.ma delivery (sift-api.gs) ----------
   function siftMini(o) {
     const s = o.sift;
@@ -785,10 +861,11 @@
     r.closest('.sd-pick').querySelectorAll('.rad').forEach((l) => l.classList.toggle('on', l.contains(r)));
     if (r.name === 'sdQuick') setSd(S.open, r.value === '1');
   });
-  el.drawer.addEventListener('submit', (e) => { if (e.target.id === 'editForm') { e.preventDefault(); saveEdit(); } });
+  el.drawer.addEventListener('submit', (e) => { if (e.target.id === 'editForm') { e.preventDefault(); saveEdit(); } else if (e.target.id === 'manualForm') { e.preventDefault(); saveManual(e.target); } });
+  el.manual.addEventListener('click', openManual);
   document.addEventListener('keydown', (e) => {
     if (el.app.hidden || el.ordersView.hidden) return;
-    if (e.key === 'Escape') { if (S.editing) { e.preventDefault(); cancelEdit(); } else if (S.open) { e.preventDefault(); closeDrawer(); } return; }
+    if (e.key === 'Escape') { if (S.editing) { e.preventDefault(); cancelEdit(); } else if (S.open || !el.drawer.hidden) { e.preventDefault(); closeDrawer(); } return; }
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '');
     if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
     // physical keys, so the shortcuts also work with an Arabic keyboard layout
@@ -811,8 +888,9 @@
       return;
     }
     el.sync.hidden = false;
-    el.csv.hidden = isConfirmer();
-    const tag = document.querySelector('.top-tag'); if (tag) tag.textContent = isConfirmer() ? S.who.name : 'الإدارة';
+    el.csv.hidden = noMoney();
+    el.manual.hidden = !can('orders_add');
+    const tag = document.querySelector('.top-tag'); if (tag) tag.textContent = S.who.role !== 'admin' ? S.who.name : 'الإدارة';
     if (window.PRUMYSL_STOCK) window.PRUMYSL_STOCK.start();
     if (!S.loaded) skeleton();
     render(); load(false); startTimer();

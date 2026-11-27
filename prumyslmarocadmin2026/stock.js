@@ -17,8 +17,30 @@
   const S = { view: 'orders', products: [], sellers: [], sales: [], summary: null, moves: [], day: '', dayTo: '', loaded: {}, busy: false,
     modal: null, moveFilter: '', editProduct: null, sift: {}, siftBusy: '' };
   const isAdmin = () => P.who.role === 'admin';
-  const isConfirmer = () => P.who.role === 'confirmer';
-  const ROLE_LABEL = { seller: 'بائع (الرحلة)', confirmer: 'تأكيد الطلبات (الهاتف)' };
+  // permissions ticked per account in « البائعون » (admin-api.gs › ADMIN_PERMS); the admin has them all
+  const can = (p) => isAdmin() || (P.who.perms || []).indexOf(p) >= 0;
+  const PERMS = [
+    ['orders', 'الطلبات', 'الطلبات: عرض، تأكيد، إلغاء، تعديل، ملاحظات، إرسال إلى SIFT'],
+    ['orders_add', 'طلب يدوي', 'إضافة طلب يدوي (واتساب / هاتف / المحل)'],
+    ['orders_money', 'المبالغ', 'رؤية المبالغ الإجمالية للطلبات وتصدير CSV'],
+    ['sales', 'المبيعات', 'تسجيل المبيعات من السيارة (يرى مبيعاته هو)'],
+    ['sales_all', 'كل المبيعات', 'رؤية كل المبيعات والإيرادات وإلغاؤها'],
+    ['stock_view', 'رؤية المخزون', 'رؤية المخزون كاملاً (المستودع، المحل، السيارة) وحركاته'],
+    ['stock_edit', 'تعديل المخزون', 'إضافة / نقل / جرد / إخراج المخزون، والبيع من أي مكان'],
+    ['products', 'المنتجات', 'إضافة المنتجات وتغيير الأسعار']
+  ];
+  const PRESETS = { seller: ['sales'], confirmer: ['orders', 'orders_add'], custom: [] };
+  const permLabel = (k) => (PERMS.find((p) => p[0] === k) || [k, k])[1];
+  // the screens this account can open
+  function allowed() {
+    if (isAdmin()) return VIEWS_ADMIN.map((v) => v[0]);
+    const v = [];
+    if (can('orders') || can('orders_add')) v.push('orders');
+    if (can('sales') || can('sales_all')) v.push('trip');
+    if (can('stock_view') || can('stock_edit')) v.push('stock');
+    if (can('products')) v.push('products');
+    return v.length ? v : ['trip'];
+  }
   const prodById = (id) => S.products.find((p) => p.id === id);
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function today() { return P.dayOf(P.now()); }
@@ -39,16 +61,18 @@
 
   // ---------- navigation ----------
   function renderNav() {
-    if (!isAdmin()) { nav.hidden = true; return; }
+    const ok = allowed();
+    if (ok.length < 2) { nav.hidden = true; return; }
     nav.hidden = false;
-    nav.innerHTML = VIEWS_ADMIN.map((v) => '<button type="button" role="tab" class="vtab' + (S.view === v[0] ? ' on' : '') + '" data-view="' + v[0] + '" aria-selected="' + (S.view === v[0]) + '">' + v[1] + '</button>').join('');
+    nav.innerHTML = VIEWS_ADMIN.filter((v) => ok.indexOf(v[0]) >= 0).map((v) => '<button type="button" role="tab" class="vtab' + (S.view === v[0] ? ' on' : '') + '" data-view="' + v[0] + '" aria-selected="' + (S.view === v[0]) + '">' + v[1] + '</button>').join('');
   }
   function go(view) {
-    if (!isAdmin()) view = isConfirmer() ? 'orders' : 'trip';
+    const ok = allowed();
+    if (ok.indexOf(view) < 0) view = ok[0];
     S.view = view;
-    try { if (isAdmin()) localStorage.setItem(LS_VIEW, view); } catch (e) {}
+    try { localStorage.setItem(LS_VIEW, view); } catch (e) {}
     renderNav();
-    topTitle.textContent = isAdmin() || isConfirmer() ? TITLES[view] : 'مبيعات الرحلة';
+    topTitle.textContent = ok.length === 1 && view === 'trip' ? 'مبيعات الرحلة' : TITLES[view];
     const tag = document.querySelector('.top-tag'); if (tag) tag.textContent = isAdmin() ? 'الإدارة' : P.who.name || 'الحساب';
     const orders = view === 'orders';
     P.showOrders(orders);
@@ -117,10 +141,12 @@
   // ===== المبيعات اليومية / مبيعات الرحلة =====
   function tripHtml() {
     const admin = isAdmin();
+    const allSales = can('sales_all');     // every seller's sales and revenue
+    const pick = can('stock_edit');        // may sell from the depot / shop
     const day = S.day || today();
     const sum = S.summary || { count: 0, items: 0, revenue: 0 };
     const active = S.products.filter((p) => p.active !== false);
-    const kpis = admin
+    const kpis = allSales
       ? '<div class="kpi dark"><span class="kpi-l">إيرادات ' + (S.dayTo && S.dayTo !== day ? 'الفترة' : day === today() ? 'اليوم' : 'اليوم المختار') + '</span><span class="kpi-v">' + num(sum.revenue) + '<small>درهم</small></span><span class="kpi-s">' + sum.count + ' عملية بيع · ' + sum.items + ' قطعة</span></div>' +
         Object.keys(sum.bySeller || {}).map((n) => '<div class="kpi"><span class="kpi-l">' + esc(n) + '</span><span class="kpi-v">' + num(sum.bySeller[n].revenue) + '<small>درهم</small></span><span class="kpi-s">' + sum.bySeller[n].count + ' عملية · ' + sum.bySeller[n].items + ' قطعة</span></div>').join('') +
         Object.keys(sum.byFrom || {}).map((f) => '<div class="kpi"><span class="kpi-l">من ' + esc(f) + '</span><span class="kpi-v">' + num(sum.byFrom[f]) + '<small>درهم</small></span><span class="kpi-s">حسب مكان البيع</span></div>').join('')
@@ -128,15 +154,15 @@
         '<div class="kpi"><span class="kpi-l">قطع في السيارة</span><span class="kpi-v">' + active.reduce((t, p) => t + Math.max(0, p.van || 0), 0) + '</span><span class="kpi-s">' + active.filter((p) => (p.van || 0) > 0).length + ' منتج متوفر</span></div>';
 
     const opts = active.map((p) => '<option value="' + esc(p.id) + '">' + esc(p.name) + ' — ' + num(p.price) + ' درهم · السيارة: ' + (p.van || 0) + '</option>').join('');
-    const form = !S.products.length && S.loaded.trip
+    const form = !can('sales') ? '' : !S.products.length && S.loaded.trip
       ? '<div class="empty"><strong>لا توجد منتجات بعد</strong>' + (admin ? 'أضف منتجاتك من قسم «المنتجات».' : 'اطلب من المدير إضافة المنتجات.') + '</div>'
       : '<form class="d-card sale-card" id="saleForm" novalidate><div class="d-row"><span class="d-h">تسجيل بيع جديد</span><span class="sale-total" id="saleTotal"></span></div>' +
         '<div class="egrid">' +
           '<label class="efld wide"><span>المنتج</span><select id="sProduct" required><option value="">— اختر المنتج —</option>' + opts + '</select></label>' +
           '<label class="efld"><span>الكمية</span><div class="stepper"><button type="button" data-step="-1" aria-label="ناقص">−</button><input id="sQty" type="number" min="1" max="1000" value="1" inputmode="numeric" dir="ltr"><button type="button" data-step="1" aria-label="زائد">+</button></div></label>' +
           '<label class="efld"><span>سعر القطعة (درهم)</span><input id="sPrice" type="number" min="0" step="1" inputmode="decimal" dir="ltr" placeholder="سعر المنتج"></label>' +
-          (admin ? '<label class="efld"><span>البيع من</span><select id="sFrom"><option value="van">السيارة</option><option value="shop">المحل</option><option value="depot">المستودع</option></select></label>' +
-            '<label class="efld"><span>البائع</span><select id="sSeller"><option value="admin">أنا (المدير)</option>' + S.sellers.filter((s) => s.active).map((s) => '<option value="' + esc(s.id) + '">' + esc(s.name) + '</option>').join('') + '</select></label>' : '') +
+          (pick ? '<label class="efld"><span>البيع من</span><select id="sFrom"><option value="van">السيارة</option><option value="shop">المحل</option><option value="depot">المستودع</option></select></label>' : '') +
+            (admin ? '<label class="efld"><span>البائع</span><select id="sSeller"><option value="admin">أنا (المدير)</option>' + S.sellers.filter((s) => s.active).map((s) => '<option value="' + esc(s.id) + '">' + esc(s.name) + '</option>').join('') + '</select></label>' : '') +
           '<label class="efld"><span>اسم الزبون (اختياري)</span><input id="sCustomer" maxlength="80" autocomplete="off"></label>' +
           '<label class="efld"><span>هاتف الزبون (اختياري)</span><input id="sPhone" maxlength="16" inputmode="tel" dir="ltr" autocomplete="off"></label>' +
           '<label class="efld"><span>المدينة (اختياري)</span><input id="sCity" maxlength="80" autocomplete="off"></label>' +
@@ -145,21 +171,21 @@
         '<div class="d-row edit-act"><button type="submit" class="btn btn-accent btn-lg" id="saleBtn">تسجيل البيع</button></div></form>';
 
     const rows = S.sales.map((s) => {
-      const canCancel = !s.cancelled && (admin || s.day === today());
-      return '<tr class="' + (s.cancelled ? 'is-cancel' : '') + '"><td class="c-date"><span dir="ltr">' + esc(s.at.slice(admin && S.dayTo ? 0 : 11)) + '</span></td>' +
+      const canCancel = !s.cancelled && (allSales || s.day === today());
+      return '<tr class="' + (s.cancelled ? 'is-cancel' : '') + '"><td class="c-date"><span dir="ltr">' + esc(s.at.slice(allSales && S.dayTo ? 0 : 11)) + '</span></td>' +
         '<td class="c-name">' + esc(s.product) + '</td><td class="num">' + s.qty + '</td><td class="num">' + dh(s.price) + '</td><td class="num c-tot">' + dh(s.total) + '</td>' +
-        (admin ? '<td>' + esc(s.sellerName || s.seller) + '</td><td>' + esc(s.from) + '</td>' : '') +
+        (allSales ? '<td>' + esc(s.sellerName || s.seller) + '</td><td>' + esc(s.from) + '</td>' : '') +
         '<td>' + esc([s.customer, s.city].filter(Boolean).join(' · ') || '—') + (s.phone ? ' <span dir="ltr" class="muted">' + esc(s.phone) + '</span>' : '') + '</td>' +
         '<td class="c-act">' + (s.cancelled ? '<span class="pill" data-k="canc">ملغاة</span>' : canCancel ? '<button type="button" class="qbtn x" data-cancel-sale="' + esc(s.id) + '">إلغاء</button>' : '') + '</td></tr>';
     }).join('');
-    const list = '<div class="d-card"><div class="d-row"><span class="d-h">' + (admin ? 'المبيعات' : 'مبيعاتي') + ' <b class="cnt">' + S.sales.length + '</b></span>' +
+    const list = '<div class="d-card"><div class="d-row"><span class="d-h">' + (allSales ? 'المبيعات' : 'مبيعاتي') + ' <b class="cnt">' + S.sales.length + '</b></span>' +
       '<div class="day-pick"><label><span>اليوم</span><input type="date" id="tDay" value="' + esc(day) + '" max="' + esc(today()) + '"></label>' +
-      (admin ? '<label><span>إلى</span><input type="date" id="tDayTo" value="' + esc(S.dayTo || '') + '" max="' + esc(today()) + '"></label>' : '') +
+      (allSales ? '<label><span>إلى</span><input type="date" id="tDayTo" value="' + esc(S.dayTo || '') + '" max="' + esc(today()) + '"></label>' : '') +
       (day !== today() || S.dayTo ? '<button type="button" class="btn btn-ghost-d btn-sm" data-today>اليوم</button>' : '') + '</div></div>' +
-      (S.loaded.trip ? (S.sales.length ? '<div class="table-wrap tw-auto"><table class="otable stable"><thead><tr><th>الوقت</th><th>المنتج</th><th class="num">الكمية</th><th class="num">السعر</th><th class="num">المجموع</th>' + (admin ? '<th>البائع</th><th>من</th>' : '') + '<th>الزبون</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+      (S.loaded.trip ? (S.sales.length ? '<div class="table-wrap tw-auto"><table class="otable stable"><thead><tr><th>الوقت</th><th>المنتج</th><th class="num">الكمية</th><th class="num">السعر</th><th class="num">المجموع</th>' + (allSales ? '<th>البائع</th><th>من</th>' : '') + '<th>الزبون</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
         : '<div class="empty"><strong>لا توجد مبيعات</strong>' + (day === today() ? 'سجّل أول بيع اليوم من النموذج أعلاه.' : 'لا توجد مبيعات في هذا اليوم.') + '</div>') : loading('المبيعات')) + '</div>';
 
-    const van = !admin ? '<div class="d-card"><span class="d-h">مخزون السيارة</span><div class="van-list">' +
+    const van = !allSales ? '<div class="d-card"><span class="d-h">مخزون السيارة</span><div class="van-list">' +
       (active.length ? active.slice().sort((a, b) => (b.van || 0) - (a.van || 0)).map((p) => '<div class="van-item' + qtyCls(p.van || 0) + '"><b>' + esc(p.name) + '</b><span>' + num(p.price) + ' درهم</span><strong>' + (p.van || 0) + '</strong></div>').join('') : '<p class="muted">لا شيء بعد.</p>') +
       '</div></div>' : '';
 
@@ -223,8 +249,8 @@
         '<td class="num">' + dh(p.price) + '</td>' +
         ['depot', 'shop', 'van'].map((l) => '<td class="num"><span class="qn' + qtyCls(p[l] || 0) + '">' + (p[l] || 0) + '</span></td>').join('') +
         '<td class="num c-tot">' + tot + '</td>' +
-        '<td class="c-act"><span class="qa"><button type="button" class="qbtn" data-move="transfer" data-p="' + esc(p.id) + '">نقل</button><button type="button" class="qbtn e" data-move="add" data-p="' + esc(p.id) + '">+ إضافة</button>' +
-        '<button type="button" class="qbtn x" data-move="count" data-p="' + esc(p.id) + '">جرد</button><button type="button" class="qbtn x" data-move="remove" data-p="' + esc(p.id) + '">إخراج</button></span></td></tr>';
+        (can('stock_edit') ? '<td class="c-act"><span class="qa"><button type="button" class="qbtn" data-move="transfer" data-p="' + esc(p.id) + '">نقل</button><button type="button" class="qbtn e" data-move="add" data-p="' + esc(p.id) + '">+ إضافة</button>' +
+        '<button type="button" class="qbtn x" data-move="count" data-p="' + esc(p.id) + '">جرد</button><button type="button" class="qbtn x" data-move="remove" data-p="' + esc(p.id) + '">إخراج</button></span></td>' : '<td></td>') + '</tr>';
     }).join('');
     const table = ps.length
       ? '<div class="table-wrap tw-auto"><table class="otable stable"><thead><tr><th>المنتج</th><th class="num">السعر</th><th class="num">المستودع</th><th class="num">المحل</th><th class="num">السيارة</th><th class="num">المجموع</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
@@ -235,7 +261,7 @@
       (movesFor.length ? '<ul class="hist moves">' + movesFor.slice(0, 80).map((m) => '<li data-k="' + moveKey(m.type) + '"><span><b>' + esc(m.type) + '</b> · ' + esc(m.product) + (m.qty ? ' × ' + m.qty : '') +
         (m.from || m.to ? ' <span class="muted">' + esc([m.from, m.to].filter(Boolean).join(' ← ')) + '</span>' : '') + (m.ref ? ' <bdi class="muted">' + esc(m.ref) + '</bdi>' : '') + (m.note ? '<br><small class="muted">' + esc(m.note) + '</small>' : '') +
         (m.by ? '<br><small class="muted">' + esc(m.by) + '</small>' : '') + '</span><time dir="ltr">' + esc(m.at) + '</time></li>').join('') + '</ul>' : '<p class="muted">لا توجد حركات بعد.</p>') + '</div>';
-    return '<section class="kpis"><div class="kpi-head"><h2>المخزون حسب المكان</h2>' + (ps.length ? '<button type="button" class="btn btn-accent" data-move="transfer" data-p="" data-preset="load">تحميل السيارة من المستودع</button>' : '') + '</div><div class="kpi-grid kpi-auto">' + kpis + '</div></section>' +
+    return '<section class="kpis"><div class="kpi-head"><h2>المخزون حسب المكان</h2>' + (ps.length && can('stock_edit') ? '<button type="button" class="btn btn-accent" data-move="transfer" data-p="" data-preset="load">تحميل السيارة من المستودع</button>' : '') + '</div><div class="kpi-grid kpi-auto">' + kpis + '</div></section>' +
       '<div class="vstack"><div class="d-card">' + table + '</div>' + moves + '</div>';
   }
   function moveKey(type) {
@@ -362,14 +388,19 @@
 
   // ===== البائعون =====
   function sellersHtml() {
-    const rows = S.sellers.map((s) => '<div class="seller-row' + (s.active ? '' : ' is-off') + '"><div><b>' + esc(s.name) + '</b><span dir="ltr" class="muted"> ' + esc(s.id) + '</span><br><small class="muted">' + esc(ROLE_LABEL[s.role || 'seller']) + '</small></div>' +
+    const boxes = (list) => '<div class="perm-grid">' + PERMS.map((p) => '<label class="chk2"><input type="checkbox" data-perm="' + p[0] + '"' + (list.indexOf(p[0]) >= 0 ? ' checked' : '') + '><span>' + esc(p[2]) + '</span></label>').join('') + '</div>';
+    const rows = S.sellers.map((s) => '<div class="seller-row' + (s.active ? '' : ' is-off') + '"><div><b>' + esc(s.name) + '</b><span dir="ltr" class="muted"> ' + esc(s.id) + '</span><br>' +
+        ((s.perms || []).length ? (s.perms || []).map((k) => '<i class="ptag">' + esc(permLabel(k)) + '</i>').join('') : '<small class="muted">بدون صلاحيات</small>') + '</div>' +
       '<span class="pill" data-k="' + (s.active ? 'done' : 'canc') + '">' + (s.active ? 'مفعّل' : 'موقوف') + '</span>' +
-      '<span class="qa"><button type="button" class="qbtn e" data-seller-pw="' + esc(s.id) + '">كلمة سر جديدة</button><button type="button" class="qbtn x" data-seller-toggle="' + esc(s.id) + '">' + (s.active ? 'إيقاف' : 'تفعيل') + '</button><button type="button" class="qbtn x" data-seller-del="' + esc(s.id) + '">حذف</button></span></div>').join('');
-    return '<section class="kpis"><div class="kpi-head"><h2>حسابات البائعين</h2></div><p class="muted"><b>بائع (الرحلة)</b>: تسجيل البيع، مبيعاته هو، ومخزون السيارة فقط. <b>تأكيد الطلبات (الهاتف)</b>: الطلبات في المتجرين (تأكيد، إلغاء، تعديل، ملاحظات، اتصال، إرسال إلى SIFT) بدون المبالغ الإجمالية ولا المخزون ولا الإعدادات.</p></section>' +
+      '<span class="qa"><button type="button" class="qbtn" data-seller-perms="' + esc(s.id) + '">الصلاحيات</button><button type="button" class="qbtn e" data-seller-pw="' + esc(s.id) + '">كلمة سر جديدة</button><button type="button" class="qbtn x" data-seller-toggle="' + esc(s.id) + '">' + (s.active ? 'إيقاف' : 'تفعيل') + '</button><button type="button" class="qbtn x" data-seller-del="' + esc(s.id) + '">حذف</button></span>' +
+      (S.permEdit === s.id ? '<form class="perm-edit" data-perm-form="' + esc(s.id) + '">' + boxes(s.perms || []) + '<div class="d-row edit-act"><button type="button" class="btn btn-ghost-d btn-sm" data-perm-cancel>إلغاء</button><button type="submit" class="btn btn-accent btn-sm">حفظ الصلاحيات</button></div></form>' : '') +
+      '</div>').join('');
+    return '<section class="kpis"><div class="kpi-head"><h2>حسابات البائعين</h2></div><p class="muted">اختر لكل حساب ما يستطيع فعله. التغيير يُطبَّق مباشرة بدون إعادة الدخول. الحسابات وإعدادات SIFT تبقى للمدير فقط.</p></section>' +
       '<div class="vstack"><form class="d-card" id="sellerForm" novalidate><span class="d-h">إضافة بائع</span><div class="egrid">' +
         '<label class="efld"><span>الاسم (يظهر في المبيعات)</span><input id="slName" maxlength="40" placeholder="علي" autocomplete="off"></label>' +
         '<label class="efld"><span>اسم المستخدم للدخول (حروف لاتينية)</span><input id="slId" maxlength="30" placeholder="ali" dir="ltr" autocapitalize="none" autocomplete="off"></label>' +
-        '<label class="efld wide"><span>نوع الحساب</span><select id="slRole"><option value="seller">بائع (الرحلة): يسجّل المبيعات من السيارة</option><option value="confirmer">تأكيد الطلبات (الهاتف): يؤكد طلبات الموقع</option></select></label>' +
+        '<label class="efld wide"><span>نقطة البداية</span><select id="slRole"><option value="seller">بائع (الرحلة)</option><option value="confirmer">تأكيد الطلبات (الهاتف)</option><option value="custom">مخصص</option></select></label>' +
+        '<div class="efld wide"><span>الصلاحيات</span>' + boxes(PRESETS.seller) + '</div>' +
         '<label class="efld wide"><span>كلمة السر (6 أحرف على الأقل)</span><input id="slPw" type="text" maxlength="60" dir="ltr" autocomplete="new-password"></label>' +
       '</div><p class="edit-err" id="sellerErr" role="alert" hidden></p><div class="d-row edit-act"><button type="submit" class="btn btn-accent">إنشاء الحساب</button></div></form>' +
       '<div class="d-card"><span class="d-h">البائعون</span>' + (S.sellers.length ? '<div class="seller-list">' + rows + '</div>' : S.loaded.sellers ? '<p class="muted">لا يوجد بائعون بعد.</p>' : loading('البائعون')) + '</div></div>';
@@ -380,12 +411,14 @@
       S.sellers = d.sellers || S.sellers;
       // an order-confirmer must also exist in the other stores' scripts (pliers), with the same password
       const acc = S.sellers.find((x) => x.id === data.id) || {};
-      const mirror = (data.role || acc.role) === 'confirmer' || (action === 'sellers_delete' && data.mirror);
+      // accounts that handle orders must also exist in the pliers store's script
+      const ordersPerm = (list) => (list || []).some((p) => p === 'orders' || p === 'orders_add');
+      const mirror = ordersPerm(data.perms || acc.perms) || (action === 'sellers_delete' && data.mirror);
       if (mirror) {
         const others = P.stores.filter((st) => st.id !== 'main' && P.isConnected(st.id));
         const res = await Promise.allSettled(others.map((st) => P.apiFor(st.id, action, data)));
         const bad = res.map((r, i) => r.status === 'rejected' ? others[i].label + ': ' + err(r.reason) : '').filter(Boolean);
-        if (bad.length) toast('لم يُنسخ الحساب إلى ' + bad.join(' · '), true);
+        if (bad.length) toast('لم يُنسخ الحساب إلى ' + bad.join(' · ') + ' — اضغط «كلمة سر جديدة» لنسخه مع كلمة السر.', true);
       }
       toast(okMsg); render(); return true;
     } catch (e) { toast(err(e), true); return false; }
@@ -404,12 +437,14 @@
     if (t.closest('[data-prod-new]')) { S.editProduct = 'new'; render(); const n = root.querySelector('#pName'); if (n) n.focus(); return; }
     const pe = t.closest('[data-prod-edit]'); if (pe) { S.editProduct = pe.dataset.prodEdit; render(); root.querySelector('#prodForm').scrollIntoView({ block: 'start', behavior: 'smooth' }); return; }
     if (t.closest('[data-prod-cancel]')) { S.editProduct = null; return render(); }
+    const pm = t.closest('[data-seller-perms]'); if (pm) { S.permEdit = S.permEdit === pm.dataset.sellerPerms ? '' : pm.dataset.sellerPerms; return render(); }
+    if (t.closest('[data-perm-cancel]')) { S.permEdit = ''; return render(); }
     const sp = t.closest('[data-seller-pw]');
     if (sp) { const pw = prompt('كلمة السر الجديدة لـ ' + sp.dataset.sellerPw + ' (6 أحرف على الأقل):'); if (pw) sellerAction('sellers_save', { id: sp.dataset.sellerPw, password: pw }, 'تم تغيير كلمة السر — سيُطلب منه الدخول من جديد'); return; }
     const sg = t.closest('[data-seller-toggle]');
     if (sg) { const s = S.sellers.find((x) => x.id === sg.dataset.sellerToggle); sellerAction('sellers_save', { id: s.id, active: !s.active }, s.active ? 'تم إيقاف الحساب' : 'تم تفعيل الحساب'); return; }
     const sd = t.closest('[data-seller-del]');
-    if (sd && confirm('حذف حساب ' + sd.dataset.sellerDel + '؟ مبيعاته تبقى مسجلة.')) { const acc = S.sellers.find((x) => x.id === sd.dataset.sellerDel) || {}; sellerAction('sellers_delete', { id: sd.dataset.sellerDel, mirror: acc.role === 'confirmer' }, 'تم حذف الحساب'); }
+    if (sd && confirm('حذف حساب ' + sd.dataset.sellerDel + '؟ مبيعاته تبقى مسجلة.')) { const acc = S.sellers.find((x) => x.id === sd.dataset.sellerDel) || {}; sellerAction('sellers_delete', { id: sd.dataset.sellerDel, mirror: (acc.perms || []).some((p) => p === 'orders' || p === 'orders_add') }, 'تم حذف الحساب'); }
   });
   root.addEventListener('input', (e) => { if (e.target.closest('#saleForm')) updateSaleTotal(); });
   root.addEventListener('change', (e) => {
@@ -417,6 +452,7 @@
     if (id === 'sProduct' || id === 'sFrom') { const pr = root.querySelector('#sPrice'); if (id === 'sProduct') pr.dataset.for = ''; updateSaleTotal(); }
     if (id === 'tDay' || id === 'tDayTo') { S.day = root.querySelector('#tDay').value || ''; const to = root.querySelector('#tDayTo'); S.dayTo = to ? to.value : ''; if (S.dayTo && S.dayTo < S.day) S.dayTo = ''; S.loaded.trip = false; render(); refresh(false); }
     if (id === 'mvFilter') { S.moveFilter = e.target.value; render(); }
+    if (id === 'slRole') { const list = PRESETS[e.target.value] || []; root.querySelectorAll('#sellerForm [data-perm]').forEach((c) => { c.checked = list.indexOf(c.dataset.perm) >= 0; }); }
     if (id === 'mProduct' || id === 'mTo') {
       const m = S.modal; if (!m) return;
       m.product = root.querySelector('#mProduct').value; const to = root.querySelector('#mTo'); if (to) m.to = to.value; const fr = root.querySelector('#mFrom'); if (fr) m.from = fr.value;
@@ -429,13 +465,18 @@
     if (f.id === 'saleForm') submitSale(f);
     else if (f.id === 'moveForm') submitMove(f);
     else if (f.id === 'prodForm') submitProduct(f);
+    else if (f.dataset.permForm) {
+      const perms = [...f.querySelectorAll('[data-perm]:checked')].map((c) => c.dataset.perm);
+      sellerAction('sellers_save', { id: f.dataset.permForm, perms: perms }, 'تم حفظ الصلاحيات').then((ok) => { if (ok) { S.permEdit = ''; render(); } });
+    }
     else if (f.id === 'sellerForm') {
       const v = (id) => f.querySelector('#' + id).value.trim();
       const errEl = f.querySelector('#sellerErr');
       const id = v('slId').toLowerCase();
       if (!/^[a-z0-9_-]{2,30}$/.test(id) || id === 'admin') { errEl.hidden = false; errEl.textContent = err({ code: 'bad_field', data: { field: 'seller_id' } }); return; }
       if (v('slPw').length < 6) { errEl.hidden = false; errEl.textContent = err({ code: 'bad_field', data: { field: 'password' } }); return; }
-      sellerAction('sellers_save', { id: id, name: v('slName') || id, password: v('slPw'), role: f.querySelector('#slRole').value }, 'تم إنشاء حساب ' + (v('slName') || id) + ' — الدخول باسم المستخدم «' + id + '»').then((ok) => { if (ok) f.reset(); });
+      const perms = [...f.querySelectorAll('[data-perm]:checked')].map((c) => c.dataset.perm);
+      sellerAction('sellers_save', { id: id, name: v('slName') || id, password: v('slPw'), role: perms.indexOf('orders') >= 0 ? 'confirmer' : 'seller', perms: perms }, 'تم إنشاء حساب ' + (v('slName') || id) + ' — الدخول باسم المستخدم «' + id + '»').then((ok) => { if (ok) f.reset(); });
     }
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && S.modal) { S.modal = null; render(); } });
@@ -446,12 +487,12 @@
     start() {
       S.loaded = {}; S.error = '';
       const saved = lsGet(LS_VIEW);
-      go(isAdmin() ? (VIEWS_ADMIN.some((v) => v[0] === saved) ? saved : 'orders') : isConfirmer() ? 'orders' : 'trip');
+      go(saved || 'orders');
       clearInterval(timer);
-      if (isConfirmer()) return;      // nothing to refresh here: the orders screen refreshes itself
       timer = setInterval(() => { if (!document.hidden && !root.hidden && !S.modal && !document.activeElement.closest('#stockView form')) refresh(false); }, 60000);
     },
     refresh: refresh,
+    perms() { renderNav(); if (allowed().indexOf(S.view) < 0) go(allowed()[0]); else if (S.view !== 'orders') render(); },
     reset() { clearInterval(timer); S.products = []; S.sales = []; S.sellers = []; S.moves = []; S.loaded = {}; S.modal = null; S.editProduct = null; S.day = S.dayTo = ''; root.innerHTML = ''; root.hidden = true; nav.hidden = true; topTitle.textContent = 'الطلبات'; const tag = document.querySelector('.top-tag'); if (tag) tag.textContent = 'الإدارة'; }
   };
   // admin.js runs first: when a saved session already opened the app, start here

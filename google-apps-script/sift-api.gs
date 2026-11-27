@@ -298,7 +298,7 @@ function siftSyncTrigger() { siftSync_(false); }
 // ---------- admin actions (panel › التوصيل) ----------
 function siftApi_(d, auth) {
   if (SIFT_ACTIONS.indexOf(d.action) < 0) return null;
-  if (auth.role !== 'admin' && !(auth.role === 'confirmer' && d.action === 'sift_push')) return { ok: false, error: 'forbidden' };
+  if (auth.role !== 'admin' && !(d.action === 'sift_push' && adminCan_(auth, 'orders'))) return { ok: false, error: 'forbidden' };
   var props = PropertiesService.getScriptProperties();
   if (d.action === 'sift_status') {
     var info = { ok: true, hasKey: !!siftKey_(), webhook: !!props.getProperty('SIFT_HOOK_ID'), lastSync: props.getProperty('SIFT_SYNC_FROM') || '' };

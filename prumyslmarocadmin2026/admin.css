@@ -301,11 +301,11 @@ button.kpi:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(15,1
 .efld { display: grid; gap: 5px; min-width: 0; }
 .efld.wide { grid-column: 1 / -1; }
 .efld > span { font-size: 12.5px; font-weight: 700; color: var(--muted); }
-.efld input:not([type="radio"]), .efld textarea { width: 100%; min-width: 0; border: 0; border-radius: 12px; background: #fff; padding: 10px 12px; font-size: 15px; box-shadow: inset 0 0 0 1.5px var(--line); }
-.efld input:not([type="radio"]) { height: 44px; }
+.efld input:not([type="radio"]):not([type="checkbox"]), .efld textarea { width: 100%; min-width: 0; border: 0; border-radius: 12px; background: #fff; padding: 10px 12px; font-size: 15px; box-shadow: inset 0 0 0 1.5px var(--line); }
+.efld input:not([type="radio"]):not([type="checkbox"]) { height: 44px; }
 .efld textarea { resize: vertical; min-height: 64px; line-height: 1.5; }
 .efld input[dir="ltr"] { text-align: right; }
-.efld input:not([type="radio"]):focus, .efld textarea:focus { outline: none; box-shadow: inset 0 0 0 2px var(--accent); }
+.efld input:not([type="radio"]):not([type="checkbox"]):focus, .efld textarea:focus { outline: none; box-shadow: inset 0 0 0 2px var(--accent); }
 .efld .rad { background: #fff; box-shadow: inset 0 0 0 1.5px var(--line); } .efld .rad.on { background: var(--accent); box-shadow: none; }
 .edit-err { background: #fdecea; color: #a1261a; border-radius: 10px; padding: 9px 12px; font-size: 13px; font-weight: 600; }
 .edit-act { justify-content: flex-end; gap: 8px; }
@@ -395,3 +395,11 @@ tr.is-off td, .seller-row.is-off { opacity: .55; }
 .checks li { display: flex; gap: 10px; align-items: baseline; background: #fff; border-radius: 10px; padding: 9px 12px; font-size: 13.5px; }
 .checks li span { font-weight: 900; width: 16px; text-align: center; }
 .checks li.ok span { color: var(--s-done); } .checks li.no span { color: #b42318; } .checks li.info span { color: var(--accent); }
+
+/* ---------- permissions per account ---------- */
+.perm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.perm-grid .chk2 { padding: 8px 10px; font-size: 13px; }
+.seller-row { flex-wrap: wrap; }
+.perm-edit { flex-basis: 100%; display: grid; gap: 8px; margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+.ptag { font-style: normal; display: inline-block; font-size: 11px; font-weight: 700; color: var(--accent); background: #e9ebf8; border-radius: 999px; padding: 0 8px; margin: 3px 0 0 4px; }
+@media (max-width: 760px) { .perm-grid { grid-template-columns: minmax(0, 1fr); } }
