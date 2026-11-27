@@ -22,7 +22,7 @@
  * The admin key never leaves Google: the panel stores only a signed, expiring session token.
  */
 
-var ADMIN_API_VERSION = 8; // 4 = order editing · 5 = seller logins + stock · 6 = SIFT delivery · 7 = order-confirmer accounts · 8 = permissions per account + manual orders
+var ADMIN_API_VERSION = 9; // 9 = product catalog for the order forms · 4 = order editing · 5 = seller logins + stock · 6 = SIFT delivery · 7 = order-confirmer accounts · 8 = permissions per account + manual orders
 // what a seller account (e.g. Ali) may do: his own van sales and the van stock — nothing else
 var ADMIN_ROLES = ['seller', 'confirmer'];
 /**
@@ -42,6 +42,7 @@ var ADMIN_ROLE_PRESETS = { seller: ['sales'], confirmer: ['orders', 'orders_add'
 // an action is allowed when the account has ANY of these permissions ('auth' is always allowed)
 var ADMIN_ACTION_PERMS = {
   list: ['orders'], update: ['orders'], sift_push: ['orders'], order_add: ['orders_add'],
+  catalog: ['orders', 'orders_add', 'sales', 'sales_all', 'stock_view', 'stock_edit', 'products'],
   stock_view: ['sales', 'sales_all', 'stock_view', 'stock_edit', 'products'],
   sale_add: ['sales'], sales_list: ['sales', 'sales_all'], sale_cancel: ['sales', 'sales_all'],
   stock_move: ['stock_edit'], moves_list: ['stock_view', 'stock_edit'], products_save: ['products']
