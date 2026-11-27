@@ -14,7 +14,7 @@
  * Permissions (admin-api.gs › ADMIN_PERMS): sales, sales_all, stock_view, stock_edit, products — ticked per account by the admin.
  */
 
-var STOCK_ACTIONS = ['stock_view', 'products_save', 'stock_move', 'sale_add', 'sales_list', 'sale_cancel', 'moves_list'];
+var STOCK_ACTIONS = ['catalog', 'stock_view', 'products_save', 'stock_move', 'sale_add', 'sales_list', 'sale_cancel', 'moves_list'];
 var STOCK_LOCS = { depot: 'المستودع', shop: 'المحل', van: 'السيارة' };
 var STOCK_LOC_COL = { depot: 7, shop: 8, van: 9 }; // G, H, I in « Products »
 var STOCK_SHEETS = {
@@ -35,6 +35,8 @@ function stockApi_(d, auth) {
     pick: adminCan_(auth, 'stock_edit')                                                                    // sell from any place
   };
   if (d.action === 'stock_view') return stockView_(caps, auth);
+  // names + prices only (no quantities): used by the order forms to fill the product and its price
+  if (d.action === 'catalog') return { ok: true, products: stockProducts_().filter(function (p) { return p.active; }).map(function (p) { return { name: p.name, price: p.price, sd: p.sd }; }) };
   if (d.action === 'sales_list') return stockSalesList_(d, caps, auth);
   if (d.action === 'moves_list') return stockMovesList_(d);
 

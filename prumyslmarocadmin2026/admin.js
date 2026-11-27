@@ -126,6 +126,7 @@
       throw new ApiError('old_script_stock', { version: S.ver[store.id] || 0 });
     }
     if (/^sift_/.test(action) && (S.ver[store.id] || 0) < 6) throw new ApiError('old_script_sift', { version: S.ver[store.id] || 0 });
+    if (action === 'catalog' && (S.ver[store.id] || 0) < 9) throw new ApiError('old_script_manual', { version: S.ver[store.id] || 0 });
     if (action === 'order_add' && (S.ver[store.id] || 0) < 8) throw new ApiError('old_script_manual', { version: S.ver[store.id] || 0 });
     // the first list after an update stamps order numbers and colours column H: give Google more time
     const data = await http(store.url, { method: 'POST', timeout: action === 'list' ? 90000 : 45000, headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -519,18 +520,74 @@
       return '<li' + (k ? ' data-k="' + k + '"' : '') + '><span>' + txt + '</span><time dir="ltr">' + esc(x.at || '') + '</time></li>';
     }).join('');
   }
+  // ---------- product catalog for the order forms (names + prices from « المنتجات ») ----------
+  // products sold by the pliers store: their orders go to the pliers store (and its own SIFT account)
+  const STORE_ITEMS = { pe: ['بانس'] };
+  S.catalog = [];
+  async function loadCatalog() {
+    if (!S.tokens.main) return;
+    try { const d = await api(STORES[0], 'catalog'); S.catalog = d.products || []; } catch (e) { /* older script: names from past orders only */ }
+  }
+  const same = (a, b) => norm(a).replace(/\s+/g, ' ').trim() === norm(b).replace(/\s+/g, ' ').trim();
+  const isPeItem = (name) => STORE_ITEMS.pe.some((x) => same(x, name));
+  function catalogFor(storeId) {
+    const list = S.catalog.filter((p) => !p.sd && (storeId === 'pe' ? isPeItem(p.name) : !isPeItem(p.name)));
+    if (storeId === 'pe' && !list.length) return [{ name: 'بانس', price: 269 }];
+    return list;
+  }
+  const findItem = (storeId, name) => catalogFor(storeId).find((p) => same(p.name, name));
+  // datalist: catalog products with their price first, then other names already used in this store's orders
+  function productOptions(storeId) {
+    const cat = catalogFor(storeId);
+    const past = Array.from(new Set(S.orders.filter((x) => x.store === storeId).map((x) => x.product).filter(Boolean)))
+      .filter((n) => !cat.some((p) => same(p.name, n))).sort((a, b) => a.localeCompare(b, 'ar'));
+    return cat.map((p) => '<option value="' + esc(p.name) + '" label="' + esc(p.price ? num(p.price) + ' درهم' : 'السعر غير محدد') + '"></option>').join('') +
+      past.map((n) => '<option value="' + esc(n) + '"></option>').join('');
+  }
+  // product picked → amount = price × quantity (until the amount is typed by hand)
+  function autoAmount(f, storeId, productId, qtyId, totalId) {
+    const it = findItem(storeId, f.querySelector('#' + productId).value);
+    const tot = f.querySelector('#' + totalId);
+    if (!it || !it.price || tot.dataset.manual === '1') return;
+    tot.value = Math.round(it.price * (parseInt(f.querySelector('#' + qtyId).value, 10) || 1));
+  }
+  function onFormInput(e) {
+    const f = e.target.closest('form'); if (!f) return;
+    const id = e.target.id;
+    if (f.id === 'manualForm') {
+      const storeSel = f.querySelector('#mStore');
+      if (id === 'mProduct' && storeSel && S.tokens.pe) {
+        // pliers belong to the pliers store: switch it so « مؤكد » goes to the pliers SIFT account
+        const want = isPeItem(e.target.value) ? 'pe' : findItem('main', e.target.value) ? 'main' : '';
+        if (want && storeSel.value !== want) { storeSel.value = want; f.querySelector('#mProducts').innerHTML = productOptions(want); showStoreHint(f); }
+      }
+      if (id === 'mStore') { f.querySelector('#mProducts').innerHTML = productOptions(e.target.value); showStoreHint(f); }
+      if (id === 'mTotal') e.target.dataset.manual = e.target.value === '' ? '' : '1';
+      if (id === 'mProduct' || id === 'mQty' || id === 'mStore') autoAmount(f, (storeSel && storeSel.value) || STORES.find((s) => S.tokens[s.id]).id, 'mProduct', 'mQty', 'mTotal');
+    } else if (f.id === 'editForm') {
+      const o = byId(S.editing); if (!o) return;
+      if (id === 'edTotal') e.target.dataset.manual = '1';
+      if (id === 'edProduct') f.querySelector('#edTotal').dataset.manual = '';
+      if (id === 'edProduct' || (id === 'edQty' && f.querySelector('#edTotal').dataset.manual === '')) autoAmount(f, o.store, 'edProduct', 'edQty', 'edTotal');
+    }
+  }
+  function showStoreHint(f) {
+    const h = f.querySelector('#mStoreHint'), s = f.querySelector('#mStore');
+    if (h && s) h.textContent = 'سيُرسل إلى SIFT الخاص بـ ' + ((storeOf(s.value) || {}).label || '') + ' عند التأكيد.';
+  }
+
   // ---------- manual order (WhatsApp / phone / shop) ----------
   function manualFormHtml() {
     const stores = STORES.filter((s) => S.tokens[s.id]);
-    const products = Array.from(new Set(S.orders.map((x) => x.product).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ar'));
+    const first = stores[0] ? stores[0].id : 'main';
     const fld = (id, label, input, wide) => '<label class="efld' + (wide ? ' wide' : '') + '" for="' + id + '"><span>' + label + '</span>' + input + '</label>';
     return '<form class="d-card edit-card" id="manualForm" novalidate><div class="d-row"><span class="d-h">طلب يدوي جديد</span><button type="button" class="d-close dark" data-close aria-label="إغلاق">✕</button></div>' +
       '<div class="egrid">' +
-        (stores.length > 1 ? fld('mStore', 'المتجر', '<select id="mStore">' + stores.map((s) => '<option value="' + s.id + '">' + esc(s.label) + '</option>').join('') + '</select>', 1) : '') +
+        (stores.length > 1 ? fld('mStore', 'المتجر', '<select id="mStore">' + stores.map((s) => '<option value="' + s.id + '">' + esc(s.label) + '</option>').join('') + '</select><small class="muted" id="mStoreHint"></small>', 1) : '') +
         fld('mName', 'الاسم', '<input id="mName" maxlength="120" autocomplete="off">') +
         fld('mPhone', 'الهاتف *', '<input id="mPhone" dir="ltr" inputmode="tel" maxlength="16" autocomplete="off" placeholder="06XXXXXXXX">') +
         fld('mCity', 'المدينة / العنوان', '<textarea id="mCity" rows="2" maxlength="300"></textarea>', 1) +
-        fld('mProduct', 'المنتج *', '<input id="mProduct" list="mProducts" maxlength="200" autocomplete="off"><datalist id="mProducts">' + products.map((p) => '<option value="' + esc(p) + '"></option>').join('') + '</datalist>', 1) +
+        fld('mProduct', 'المنتج *', '<input id="mProduct" list="mProducts" maxlength="200" autocomplete="off"><datalist id="mProducts">' + productOptions(first) + '</datalist>', 1) +
         fld('mQty', 'الكمية', '<input id="mQty" type="number" min="1" max="999" step="1" value="1" inputmode="numeric" dir="ltr">') +
         fld('mTotal', 'المبلغ الإجمالي (درهم) *', '<input id="mTotal" type="number" min="0" step="1" inputmode="decimal" dir="ltr">') +
         fld('mSource', 'مصدر الطلب', '<select id="mSource"><option value="whatsapp">واتساب</option><option value="phone">هاتف</option><option value="shop">المحل</option><option value="other">آخر</option></select>') +
@@ -546,6 +603,9 @@
     if (!S.open) lastFocus = document.activeElement;
     S.open = null; S.editing = null;
     el.drawer.innerHTML = manualFormHtml();
+    showStoreHint(el.drawer.querySelector('#manualForm'));
+    // fresh names + prices (they may have just been changed in « المنتجات »)
+    loadCatalog().then(() => { const f = el.drawer.querySelector('#manualForm'); if (f) { const s = f.querySelector('#mStore'); f.querySelector('#mProducts').innerHTML = productOptions(s ? s.value : STORES.find((x) => S.tokens[x.id]).id); } });
     el.drawer.hidden = false; el.scrim.hidden = false; document.body.classList.add('no-scroll');
     el.drawer.scrollTop = 0;
     setTimeout(() => { const n = el.drawer.querySelector('#mName'); if (n) n.focus(); }, 60);
@@ -623,15 +683,13 @@
   }
   // "تعديل الطلب": name, phone, city / address, product, quantity, amount, SD card
   function editFormHtml(o) {
-    const products = Array.from(new Set(S.orders.filter((x) => x.store === o.store).map((x) => x.product).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ar'));
     const fld = (id, label, input, wide) => '<label class="efld' + (wide ? ' wide' : '') + '" for="' + id + '"><span>' + label + '</span>' + input + '</label>';
     return '<form class="d-card edit-card" id="editForm" novalidate><div class="d-row"><span class="d-h">تعديل الطلب <bdi>' + esc(o.id) + '</bdi></span></div>' +
       '<div class="egrid">' +
         fld('edName', 'الاسم', '<input id="edName" maxlength="120" autocomplete="off" value="' + esc(o.name) + '">') +
         fld('edPhone', 'الهاتف', '<input id="edPhone" dir="ltr" inputmode="tel" maxlength="16" autocomplete="off" value="' + esc(o.phone) + '">') +
         fld('edCity', 'المدينة / العنوان', '<textarea id="edCity" rows="2" maxlength="300">' + esc(o.city) + '</textarea>', 1) +
-        fld('edProduct', 'المنتج', '<input id="edProduct" list="edProducts" maxlength="200" autocomplete="off" value="' + esc(o.product) + '"><datalist id="edProducts">' +
-          products.map((p) => '<option value="' + esc(p) + '"></option>').join('') + '</datalist>', 1) +
+        fld('edProduct', 'المنتج', '<input id="edProduct" list="edProducts" maxlength="200" autocomplete="off" value="' + esc(o.product) + '"><datalist id="edProducts">' + productOptions(o.store) + '</datalist>', 1) +
         fld('edQty', 'الكمية', '<input id="edQty" type="number" min="1" max="999" step="1" inputmode="numeric" dir="ltr" value="' + esc(o.qty) + '">') +
         fld('edTotal', 'المبلغ الإجمالي (درهم)', '<input id="edTotal" type="number" min="0" step="1" inputmode="decimal" dir="ltr" value="' + esc(o.total) + '">') +
       '</div>' +
@@ -710,6 +768,7 @@
     if (S.open !== id) openDrawer(id);
     S.editing = id;
     renderDrawer(o);
+    loadCatalog().then(() => { const f = el.drawer.querySelector('#editForm'); const dl = f && f.querySelector('#edProducts'); if (dl) dl.innerHTML = productOptions(o.store); });
     const f = el.drawer.querySelector('#editForm');
     if (f) { f.scrollIntoView({ block: 'start', behavior: 'smooth' }); setTimeout(() => { const n = el.drawer.querySelector('#edName'); if (n) n.focus({ preventScroll: true }); }, 60); }
   }
@@ -856,6 +915,8 @@
     const c = e.target.closest('[data-copy]'); if (c) return copy(c.dataset.copy);
     if (e.target.closest('[data-sift-push]') && S.open) return siftPush(S.open);
   });
+  el.drawer.addEventListener('input', onFormInput);
+  el.drawer.addEventListener('change', (e) => { if (e.target.id === 'mStore') onFormInput(e); });
   el.drawer.addEventListener('change', (e) => {
     const r = e.target.closest('input[type="radio"]'); if (!r || !S.open) return;
     r.closest('.sd-pick').querySelectorAll('.rad').forEach((l) => l.classList.toggle('on', l.contains(r)));
