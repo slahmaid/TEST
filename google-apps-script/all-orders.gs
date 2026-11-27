@@ -534,8 +534,13 @@ function doGet(e) {
 
 function doPost(e) {
   try {
+    // status updates sent by SIFT.ma (sift-api.gs) — POST …/exec?sift=<secret>
+    if (e && e.parameter && e.parameter.sift && typeof siftWebhook_ === 'function') return siftWebhook_(e);
     // JSON calls from the admin panel (admin-api.gs)
     if (typeof isAdminRequest_ === 'function' && isAdminRequest_(e)) return adminApi_(e);
+    // a JSON body is never a website order (the order forms send form data): never save it as an empty row
+    var rawBody = e && e.postData && e.postData.contents ? String(e.postData.contents).replace(/^\s+/, '') : '';
+    if (rawBody.charAt(0) === '{') return jsonOut_({ status: 'error', message: 'not an order' });
 
     var p = parsePostParams_(e);
     if (p.action === 'ozon_add_parcel') return ozonAddParcelResponse_(p);
@@ -544,6 +549,10 @@ function doPost(e) {
     var quantity = parseQuantity_(p);
     var price = parsePrice_(p);
 
+    // no name, phone and product at all: not a real order
+    if (!String(p.name || '').trim() && !String(p.phone || '').replace(/\D/g, '') && !String(p.product || p.model || p.product_offer || '').trim()) {
+      return jsonOut_({ status: 'error', message: 'empty order' });
+    }
     var base = [
       new Date(),
       String(p.name || '').trim(),
