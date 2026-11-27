@@ -108,6 +108,7 @@ function siftPushRow_(r) {
   if (st.id) {
     // a draft is already in SIFT (e.g. refused for its city): send the corrected details before booking again
     var u = siftFetch_('patch', '/orders/' + encodeURIComponent(st.id), body);
+    if (!u.ok && u.status !== 404 && siftCheckBusy_(st, out)) return out;
     if (!u.ok && u.status !== 404) {
       st.error = u.error; st.message = u.message; st.at = stockNowSafe_();
       out.note = 'SIFT: تعذّر تحديث الطلب هناك — ' + siftErrText_(u.error, u.message);
@@ -134,6 +135,7 @@ function siftPushRow_(r) {
       st.error = String(res.errorCode || res.code || b.error || res.status || 'NOT_BOOKED');
       st.message = String(res.message || b.message || '');
       st.state = 'draft';
+      if (siftCheckBusy_(st, out)) return out;
     }
   }
   st.at = stockNowSafe_();
@@ -141,6 +143,27 @@ function siftPushRow_(r) {
   else out.note = 'SIFT: الطلب أُنشئ لكن لم يُحجز بعد — ' + siftErrText_(st.error, st.message);
   out.state = st;
   return out;
+}
+
+/**
+ * SIFT is still handing the order to the carrier (state « submitting »): the order is locked there for a moment.
+ * That is not an error: mark it as being sent, the sync fills in the tracking number once it is booked.
+ */
+function siftCheckBusy_(st, out) {
+  if (!st.id) return false;
+  var g = siftFetch_('get', '/orders/' + encodeURIComponent(st.id));
+  if (!g.ok || !g.data) return false;
+  if (g.data.trackingNumber) {
+    st.tracking = g.data.trackingNumber; st.state = g.data.state || 'booked';
+    delete st.error; delete st.message; st.at = stockNowSafe_();
+    out.note = 'أُرسل إلى SIFT — رقم التتبع ' + st.tracking; out.state = st;
+    return true;
+  }
+  if (g.data.state !== 'submitting') return false;
+  st.state = 'submitting'; delete st.error; delete st.message; st.at = stockNowSafe_();
+  out.note = 'SIFT: قيد الإرسال إلى شركة التوصيل — سيظهر رقم التتبع تلقائياً';
+  out.state = st;
+  return true;
 }
 
 function siftErrText_(code, msg) {
@@ -196,7 +219,7 @@ function siftApply_(sheet, values, o) {
   var newSift = ship.status || (o.state === 'cancelled' ? 'cancelled' : st.status || '');
   var changed = false;
   if (!st.id && o.id) { st.id = o.id; changed = true; }
-  if (o.trackingNumber && st.tracking !== o.trackingNumber) { st.tracking = o.trackingNumber; changed = true; }
+  if (o.trackingNumber && st.tracking !== o.trackingNumber) { st.tracking = o.trackingNumber; delete st.error; delete st.message; changed = true; }
   if (o.state && st.state !== o.state) { st.state = o.state; changed = true; }
   var hist = adminHist_(r[ADMIN_COL.hist - 1]);
   var at = stockNowSafe_();

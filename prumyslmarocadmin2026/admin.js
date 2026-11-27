@@ -643,9 +643,12 @@
   }
 
   // ---------- SIFT.ma delivery (sift-api.gs) ----------
+  // SIFT is still handing the order to the carrier: locked there for a moment, the tracking number comes with the sync
+  const siftBusy = (s) => !!s && !s.tracking && (s.state === 'submitting' || /ORDER_LOCKED/.test(String(s.error || '') + String(s.message || '')));
   function siftMini(o) {
     const s = o.sift;
     if (!s) return '';
+    if (siftBusy(s)) return '<small class="sift-mini">SIFT · قيد الإرسال</small>';
     if (s.error && !s.tracking) return '<small class="sift-mini err" title="' + esc(s.message || s.error) + '">SIFT ⚠</small>';
     return '<small class="sift-mini">' + (s.label ? esc(s.label) : 'SIFT') + (s.tracking ? ' · <bdi dir="ltr">' + esc(s.tracking) + '</bdi>' : '') + '</small>';
   }
@@ -657,6 +660,8 @@
       return '<div class="d-card sift-card"><div class="d-row"><span class="d-h">التوصيل · SIFT</span><button type="button" class="btn btn-accent btn-sm" data-sift-push>إرسال إلى SIFT</button></div>' +
         '<small class="muted">لم يُرسل هذا الطلب بعد. الطلبات تُرسل تلقائياً عند «تأكيد».</small></div>';
     }
+    if (siftBusy(s)) return '<div class="d-card sift-card"><div class="d-row"><span class="d-h">التوصيل · SIFT</span><span class="pill" data-k="ship">قيد الإرسال</span></div>' +
+      '<small class="muted">SIFT يُرسل هذا الطلب إلى شركة التوصيل. سيظهر رقم التتبع هنا تلقائياً (خلال 15 دقيقة من الحجز). لا حاجة لإعادة الإرسال.</small></div>';
     return '<div class="d-card sift-card' + (s.error && !s.tracking ? ' bad' : '') + '"><div class="d-row"><span class="d-h">التوصيل · SIFT</span>' +
       (s.label ? '<span class="pill" data-k="' + (s.status === 'delivered' ? 'done' : /return|refused/.test(s.status) ? 'ret' : s.status === 'cancelled' ? 'canc' : 'ship') + '">' + esc(s.label) + '</span>' : '') + '</div>' +
       (s.tracking ? '<div class="d-row"><span>رقم التتبع</span><span><bdi dir="ltr" class="trk">' + esc(s.tracking) + '</bdi> <button type="button" class="qbtn x" data-copy="' + esc(s.tracking) + '">نسخ</button></span></div>' : '') +
