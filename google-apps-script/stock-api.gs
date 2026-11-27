@@ -11,7 +11,7 @@
  * (matched by product name / « Online names »; plus one SD card product per unit when the order has an SD card).
  * If it goes back to another status (ملغي، مرتجع…), the same quantities return to the depot.
  *
- * Roles (admin-api.gs): the admin can do everything; a seller (e.g. Ali) only sees the van stock and his own sales.
+ * Permissions (admin-api.gs › ADMIN_PERMS): sales, sales_all, stock_view, stock_edit, products — ticked per account by the admin.
  */
 
 var STOCK_ACTIONS = ['stock_view', 'products_save', 'stock_move', 'sale_add', 'sales_list', 'sale_cancel', 'moves_list'];
@@ -27,10 +27,15 @@ var STOCK_SHIPPED = ['تم الشحن', 'تم التسليم'];
 // ---------- entry point (called by adminApi_ after the login check) ----------
 function stockApi_(d, auth) {
   if (STOCK_ACTIONS.indexOf(d.action) < 0) return null;
-  var admin = auth.role === 'admin';
-  if (!admin && ADMIN_SELLER_ACTIONS.indexOf(d.action) < 0) return { ok: false, error: 'forbidden' };
-  if (d.action === 'stock_view') return stockView_(admin, auth);
-  if (d.action === 'sales_list') return stockSalesList_(d, admin, auth);
+  // what this account may see / do (permissions were already checked per action in adminApi_)
+  var caps = {
+    admin: auth.role === 'admin',
+    full: adminCan_(auth, 'stock_view') || adminCan_(auth, 'stock_edit') || adminCan_(auth, 'products'),  // whole stock, all fields
+    all: adminCan_(auth, 'sales_all'),                                                                    // every seller's sales
+    pick: adminCan_(auth, 'stock_edit')                                                                    // sell from any place
+  };
+  if (d.action === 'stock_view') return stockView_(caps, auth);
+  if (d.action === 'sales_list') return stockSalesList_(d, caps, auth);
   if (d.action === 'moves_list') return stockMovesList_(d);
 
   var lock = LockService.getScriptLock();
@@ -38,8 +43,8 @@ function stockApi_(d, auth) {
   try {
     if (d.action === 'products_save') return stockProductSave_(d, auth);
     if (d.action === 'stock_move') return stockMove_(d, auth);
-    if (d.action === 'sale_add') return stockSaleAdd_(d, admin, auth);
-    if (d.action === 'sale_cancel') return stockSaleCancel_(d, admin, auth);
+    if (d.action === 'sale_add') return stockSaleAdd_(d, caps, auth);
+    if (d.action === 'sale_cancel') return stockSaleCancel_(d, caps, auth);
   } finally {
     lock.releaseLock();
   }
@@ -102,10 +107,10 @@ function stockPublic_(p, admin) {
 }
 
 // ---------- actions ----------
-function stockView_(admin, auth) {
-  var products = stockProducts_().filter(function (p) { return admin || p.active; });
-  var out = { ok: true, today: stockToday_(), role: auth.role, user: auth.user, name: auth.name, products: products.map(function (p) { return stockPublic_(p, admin); }) };
-  if (admin) out.sellers = adminSellersPublic_();
+function stockView_(caps, auth) {
+  var products = stockProducts_().filter(function (p) { return caps.full || p.active; });
+  var out = { ok: true, today: stockToday_(), role: auth.role, user: auth.user, name: auth.name, products: products.map(function (p) { return stockPublic_(p, caps.full); }) };
+  if (caps.admin) out.sellers = adminSellersPublic_();
   return out;
 }
 
@@ -200,17 +205,17 @@ function stockSales_() {
   return sh.getRange(2, 1, last - 1, 16).getValues().map(stockSaleRow_).filter(function (s) { return s.id; });
 }
 
-function stockSaleAdd_(d, admin, auth) {
+function stockSaleAdd_(d, caps, auth) {
   var products = stockProducts_();
   var p = stockFind_(products, d.product);
-  if (!p || (!admin && !p.active)) return { ok: false, error: 'not_found' };
+  if (!p || (!caps.full && !p.active)) return { ok: false, error: 'not_found' };
   var qty = stockInt_(d.qty);
   if (qty < 1 || qty > 1000) return { ok: false, error: 'bad_field', field: 'qty' };
   var price = d.price == null || d.price === '' ? p.price : stockNum_(d.price);
   if (!(price >= 0) || price > 1000000) return { ok: false, error: 'bad_field', field: 'price' };
-  var from = admin && STOCK_LOC_COL[d.from] ? String(d.from) : 'van';   // sellers always sell from the van
+  var from = caps.pick && STOCK_LOC_COL[d.from] ? String(d.from) : 'van';   // only « stock_edit » may sell from the depot / shop
   var seller = auth.user, sellerName = auth.name;
-  if (admin && d.seller && d.seller !== 'admin') {
+  if (caps.admin && d.seller && d.seller !== 'admin') {
     var s = adminSellers_()[String(d.seller)];
     if (s) { seller = String(d.seller); sellerName = s.name; }
   }
@@ -226,15 +231,15 @@ function stockSaleAdd_(d, admin, auth) {
   stockLog_('بيع', p, qty, from, '', sellerName, id, price !== p.price ? 'سعر البيع ' + price + ' (السعر العادي ' + p.price + ')' : '');
   var sales = stockSales_();
   var sale = sales.filter(function (x) { return x.id === id; })[0];
-  return { ok: true, sale: sale, product: stockPublic_(p, admin), lowStock: p[from] < 0 };
+  return { ok: true, sale: sale, product: stockPublic_(p, caps.full), lowStock: p[from] < 0 };
 }
 
-function stockSaleCancel_(d, admin, auth) {
+function stockSaleCancel_(d, caps, auth) {
   var sales = stockSales_();
   var sale = sales.filter(function (x) { return x.id === String(d.id || ''); })[0];
   if (!sale) return { ok: false, error: 'not_found' };
   if (sale.cancelled) return { ok: true, sale: sale };
-  if (!admin && (sale.seller !== auth.user || sale.day !== stockToday_())) return { ok: false, error: 'forbidden' };
+  if (!caps.all && (sale.seller !== auth.user || sale.day !== stockToday_())) return { ok: false, error: 'forbidden' };
   var products = stockProducts_();
   var p = stockFind_(products, sale.productId);
   var loc = 'van';
@@ -245,16 +250,16 @@ function stockSaleCancel_(d, admin, auth) {
     stockLog_('إلغاء بيع', p, sale.qty, '', loc, auth.name, sale.id, String(d.reason || '').slice(0, 200));
   }
   sale.cancelled = true;
-  return { ok: true, sale: sale, product: p ? stockPublic_(p, admin) : null };
+  return { ok: true, sale: sale, product: p ? stockPublic_(p, caps.full) : null };
 }
 
 /** from / to = yyyy-MM-dd (default: today). A seller only gets his own sales and his own totals. */
-function stockSalesList_(d, admin, auth) {
+function stockSalesList_(d, caps, auth) {
   var today = stockToday_();
   var from = /^\d{4}-\d{2}-\d{2}$/.test(d.from || '') ? d.from : today;
   var to = /^\d{4}-\d{2}-\d{2}$/.test(d.to || '') ? d.to : from;
   var list = stockSales_().filter(function (s) {
-    return s.day >= from && s.day <= to && (admin || s.seller === auth.user);
+    return s.day >= from && s.day <= to && (caps.all || s.seller === auth.user);
   }).sort(function (a, b) { return b.ts - a.ts || b.row - a.row; });
   var sum = { count: 0, items: 0, revenue: 0, bySeller: {}, byFrom: {}, byProduct: {} };
   list.forEach(function (s) {
@@ -267,7 +272,7 @@ function stockSalesList_(d, admin, auth) {
     sum.byProduct[s.product] = (sum.byProduct[s.product] || 0) + s.qty;
   });
   sum.revenue = Math.round(sum.revenue * 100) / 100;
-  if (!admin) { delete sum.bySeller; delete sum.byFrom; }
+  if (!caps.all) { delete sum.bySeller; delete sum.byFrom; }
   return { ok: true, from: from, to: to, today: today, sales: list.map(function (s) { delete s.row; return s; }), summary: sum };
 }
 

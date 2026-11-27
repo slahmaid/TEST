@@ -22,12 +22,38 @@
  * The admin key never leaves Google: the panel stores only a signed, expiring session token.
  */
 
-var ADMIN_API_VERSION = 7; // 4 = order editing · 5 = seller logins + stock · 6 = SIFT delivery · 7 = order-confirmer accounts
+var ADMIN_API_VERSION = 8; // 4 = order editing · 5 = seller logins + stock · 6 = SIFT delivery · 7 = order-confirmer accounts · 8 = permissions per account + manual orders
 // what a seller account (e.g. Ali) may do: his own van sales and the van stock — nothing else
-var ADMIN_SELLER_ACTIONS = ['auth', 'stock_view', 'sale_add', 'sales_list', 'sale_cancel'];
-// what an order-confirmer account (e.g. Reda, confirming by phone) may do: the orders and sending them to SIFT — no totals, stock or settings
-var ADMIN_CONFIRMER_ACTIONS = ['auth', 'list', 'update', 'sift_push'];
 var ADMIN_ROLES = ['seller', 'confirmer'];
+/**
+ * Permissions an account can be given (ticked by the admin in the panel › البائعون):
+ *   orders        orders of the store: view, confirm, cancel, edit, notes, send to SIFT
+ *   orders_add    add a manual order (WhatsApp / phone / shop)
+ *   orders_money  money totals of the orders + CSV export (panel only)
+ *   sales         record road-trip sales from the van, see his own sales
+ *   sales_all     see / cancel every seller's sales and the revenue
+ *   stock_view    see the whole stock (depot, shop, van) and its moves
+ *   stock_edit    add / move / count / remove stock, sell from any place
+ *   products      add products and change prices
+ * Accounts and SIFT settings stay with the admin.
+ */
+var ADMIN_PERMS = ['orders', 'orders_add', 'orders_money', 'sales', 'sales_all', 'stock_view', 'stock_edit', 'products'];
+var ADMIN_ROLE_PRESETS = { seller: ['sales'], confirmer: ['orders', 'orders_add'] };
+// an action is allowed when the account has ANY of these permissions ('auth' is always allowed)
+var ADMIN_ACTION_PERMS = {
+  list: ['orders'], update: ['orders'], sift_push: ['orders'], order_add: ['orders_add'],
+  stock_view: ['sales', 'sales_all', 'stock_view', 'stock_edit', 'products'],
+  sale_add: ['sales'], sales_list: ['sales', 'sales_all'], sale_cancel: ['sales', 'sales_all'],
+  stock_move: ['stock_edit'], moves_list: ['stock_view', 'stock_edit'], products_save: ['products']
+};
+var ADMIN_OUT_PERMS = null; // the signed-in account's permissions, added to every answer
+function adminPerms_(s) {
+  var p = s && Object.prototype.toString.call(s.perms) === '[object Array]' ? s.perms : ADMIN_ROLE_PRESETS[(s && s.role) || 'seller'] || [];
+  return p.filter(function (x) { return ADMIN_PERMS.indexOf(x) >= 0; });
+}
+function adminCan_(auth, perm) {
+  return !!auth && (auth.role === 'admin' || (auth.perms || []).indexOf(perm) >= 0);
+}
 var ADMIN_COL = { status: 8, id: 10, note: 11, updated: 12, hist: 13, source: 14, sd: 15, stock: 16, sift: 17 }; // H, J…P, Q
 var ADMIN_TOTAL_COLS = 17; // A..Q
 var ADMIN_STATUS_HEADER = 'Order Statut';
@@ -70,6 +96,7 @@ function adminOut_(obj) {
   obj.version = ADMIN_API_VERSION;
   obj.service = 'prumysl-admin';
   obj.store = adminPrefix_();
+  if (ADMIN_OUT_PERMS && !('perms' in obj)) obj.perms = ADMIN_OUT_PERMS;
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -107,16 +134,21 @@ function adminNewOrderRow_(base, source) {
 
 function adminApi_(e) {
   var d;
+  ADMIN_OUT_PERMS = null;
   try { d = JSON.parse(e.postData.contents); } catch (err) { return adminOut_({ ok: false, error: 'bad_action' }); }
   try {
     var auth = adminCheck_(d.key, d.user);
     if (!auth.ok) return adminOut_(auth);
     // sellers (e.g. Ali on the road trip) only reach the van-sales actions, never the orders or the totals
-    if (auth.role === 'seller' && ADMIN_SELLER_ACTIONS.indexOf(d.action) < 0) return adminOut_({ ok: false, error: 'forbidden' });
-    if (auth.role === 'confirmer' && ADMIN_CONFIRMER_ACTIONS.indexOf(d.action) < 0) return adminOut_({ ok: false, error: 'forbidden' });
+    ADMIN_OUT_PERMS = auth.role === 'admin' ? ['*'] : (auth.perms || []);
+    if (auth.role !== 'admin' && d.action !== 'auth') {
+      var need = ADMIN_ACTION_PERMS[d.action];
+      if (!need || !need.some(function (p) { return adminCan_(auth, p); })) return adminOut_({ ok: false, error: 'forbidden' });
+    }
     if (d.action === 'auth') return adminOut_({ ok: true, token: adminMakeToken_(!!d.remember, auth), role: auth.role, user: auth.user, name: auth.name });
     if (d.action === 'list') return adminList_();
     if (d.action === 'update') return adminUpdate_(d, auth);
+    if (d.action === 'order_add') return adminOrderAdd_(d, auth);
     if (d.action === 'sellers_list') return adminOut_({ ok: true, sellers: adminSellersPublic_() });
     if (d.action === 'sellers_save') return adminOut_(adminSellerSave_(d));
     if (d.action === 'sellers_delete') return adminOut_(adminSellerDelete_(d));
@@ -194,7 +226,7 @@ function adminCheck_(key, user) {
     if (m2[2] === 'admin') return { ok: true, role: 'admin', user: 'admin', name: 'المدير' };
     var s = adminSellers_()[m2[3]];
     if (!s || !s.active || String(s.ver) !== m2[4] || (s.role || 'seller') !== m2[2]) return { ok: false, error: 'expired' };
-    return { ok: true, role: s.role || 'seller', user: m2[3], name: s.name, ver: s.ver };
+    return { ok: true, role: s.role || 'seller', user: m2[3], name: s.name, ver: s.ver, perms: adminPerms_(s) };
   }
   if (/^v1\.\d{10}\.[A-Za-z0-9_-]+$/.test(key)) {
     var parts = key.split('.');
@@ -217,7 +249,7 @@ function adminCheck_(key, user) {
   var seller = adminSellers_()[uid];
   if (seller && seller.active && key && adminSafeEq_(adminHash_(seller.salt, key), seller.hash)) {
     cache.remove('adm_fails' + bucket);
-    return { ok: true, role: seller.role || 'seller', user: uid, name: seller.name, ver: seller.ver };
+    return { ok: true, role: seller.role || 'seller', user: uid, name: seller.name, ver: seller.ver, perms: adminPerms_(seller) };
   }
   return adminFail_(cache, bucket, nowS);
 }
@@ -237,7 +269,7 @@ function adminHash_(salt, pw) {
 }
 function adminSellersPublic_() {
   var all = adminSellers_();
-  return Object.keys(all).sort().map(function (id) { return { id: id, name: all[id].name, role: all[id].role || 'seller', active: !!all[id].active }; });
+  return Object.keys(all).sort().map(function (id) { return { id: id, name: all[id].name, role: all[id].role || 'seller', perms: adminPerms_(all[id]), active: !!all[id].active }; });
 }
 function adminSellerSave_(d) {
   var id = String(d.id || '').trim().toLowerCase();
@@ -255,6 +287,13 @@ function adminSellerSave_(d) {
     if ((s.role || 'seller') !== String(d.role)) { s.role = String(d.role); s.ver = Number(s.ver || 0) + 1; }
   }
   if (pw) { s.salt = Utilities.getUuid(); s.hash = adminHash_(s.salt, pw); s.ver = Number(s.ver || 0) + 1; }
+  // permissions take effect at once (read on every request), no new login needed
+  if (d.perms != null) {
+    if (Object.prototype.toString.call(d.perms) !== '[object Array]') return { ok: false, error: 'bad_field', field: 'perms' };
+    s.perms = d.perms.map(String).filter(function (x, i, a) { return ADMIN_PERMS.indexOf(x) >= 0 && a.indexOf(x) === i; });
+  } else if (!all[id] && d.role != null) {
+    s.perms = (ADMIN_ROLE_PRESETS[String(d.role)] || []).slice();
+  }
   if (d.active != null) {
     var act = d.active === true || d.active === 'true';
     if (act !== !!s.active) { s.active = act; s.ver = Number(s.ver || 0) + 1; }
@@ -699,4 +738,47 @@ function removeEmptyOrderRows() {
   } finally {
     lock.releaseLock();
   }
+}
+
+// ---------- manual orders (panel › الطلبات › « + طلب يدوي ») ----------
+var ADMIN_MANUAL_SOURCES = { whatsapp: 'واتساب', phone: 'هاتف', shop: 'المحل', other: 'يدوي' };
+/**
+ * { name, phone*, city, product*, qty, total*, sd, source: whatsapp|phone|shop|other, status: جديد|مؤكد, note }
+ * The order is added to the « Orders » sheet like a website order (column N Source = manual-<source>), gets its
+ * order number at once, and « مؤكد » goes through the normal confirmation (SIFT…).
+ */
+function adminOrderAdd_(d, auth) {
+  var e = adminCleanEdit_({ name: d.name, city: d.city, phone: d.phone, product: d.product, qty: d.qty == null ? 1 : d.qty, total: d.total, sd: d.sd });
+  if (e.error) return adminOut_({ ok: false, error: 'bad_field', field: e.error });
+  var v = e.v;
+  if (!v.phone) return adminOut_({ ok: false, error: 'bad_field', field: 'phone' });
+  if (!v.product) return adminOut_({ ok: false, error: 'bad_field', field: 'product' });
+  if (v.total == null) return adminOut_({ ok: false, error: 'bad_field', field: 'total' });
+  var src = ADMIN_MANUAL_SOURCES[d.source] ? String(d.source) : 'other';
+  var who = auth && auth.role !== 'admin' ? auth.name : 'المدير';
+  var note = String(d.note == null ? '' : d.note).slice(0, 1000).trim();
+  var sheet = adminSheet_();
+  var lock = adminLock_();
+  if (!lock) return adminOut_({ ok: false, error: 'busy' });
+  var id;
+  try {
+    id = adminNextId_(PropertiesService.getScriptProperties());
+    var at = Utilities.formatDate(new Date(), ADMIN_TZ, 'dd/MM/yyyy HH:mm');
+    var row = adminNewOrderRow_([new Date(), v.name || '', v.city || '', v.phone, v.product, v.qty || 1, v.total], 'manual-' + src);
+    row[ADMIN_COL.id - 1] = id;
+    row[ADMIN_COL.note - 1] = note;
+    row[ADMIN_COL.updated - 1] = at;
+    row[ADMIN_COL.hist - 1] = JSON.stringify([{ at: at, note: 'طلب يدوي (' + ADMIN_MANUAL_SOURCES[src] + ') — أضافه ' + who }]);
+    row[ADMIN_COL.sd - 1] = v.sd == null ? '' : (v.sd ? 'نعم' : 'لا');
+    sheet.appendRow(row);
+  } finally {
+    lock.releaseLock();
+  }
+  if (d.status === 'مؤكد') return adminUpdate_({ id: id, status: 'مؤكد' }, auth);   // SIFT, history… as for any confirmation
+  var last = sheet.getLastRow();
+  var col = sheet.getRange(2, ADMIN_COL.id, last - 1, 1).getValues();
+  for (var i = col.length - 1; i >= 0; i--) {
+    if (String(col[i][0]) === id) return adminOut_({ ok: true, order: adminRowToOrder_(sheet.getRange(i + 2, 1, 1, ADMIN_TOTAL_COLS).getValues()[0], i + 2) });
+  }
+  return adminOut_({ ok: true, order: { id: id } });
 }
