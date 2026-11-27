@@ -274,7 +274,7 @@
     const tick = setInterval(() => { if (S.busy) setSync('busy'); }, 1000);
     try {
       const results = await Promise.allSettled(stores.map((s) => api(s, 'list')));
-      const prevIds = new Set(S.orders.map((o) => o.id));
+      const prevIds = new Set(S.orders.map(keyOf));
       const wasLoaded = S.loaded;
       let list = [], okCount = 0, authFail = null;
       results.forEach((r, i) => {
@@ -287,7 +287,7 @@
           S.today = d.today || dayOf(now());
           (d.orders || []).forEach((o) => {
             o.store = st.id;
-            const p = S.pending[o.id];
+            const p = S.pending[keyOf(o)];
             list.push(p ? Object.assign(o, { status: p.to }) : o);
           });
         } else {
@@ -309,7 +309,7 @@
       if (authFail) keepTokens(!!lsGet(LS_KEY));
       S.orders = list;
       if (!S.seen) { S.seen = { ts: list.reduce((m, o) => Math.max(m, o.ts || 0), 0), ids: [] }; saveSeen(); }
-      const fresh = list.filter((o) => isNew(o) && (!wasLoaded || !prevIds.has(o.id)));
+      const fresh = list.filter((o) => isNew(o) && (!wasLoaded || !prevIds.has(keyOf(o))));
       if (wasLoaded && fresh.length) {
         toast(fresh.length === 1 ? 'طلب جديد: ' + fresh[0].id + ' — ' + fresh[0].name : fresh.length + ' طلبات جديدة');
         ding();
@@ -352,8 +352,10 @@
     el.warn.innerHTML = ids.map((id) => '<p><b>' + esc(storeOf(id).label) + ':</b> ' + esc(S.storeErr[id]) +
       (S.tokens[id] ? '' : ' <span>(طلبات هذا المتجر غير معروضة)</span>') + '</p>').join('');
   }
-  const byId = (id) => S.orders.find((o) => o.id === id);
-  function isNew(o) { return !!S.seen && o.ts > S.seen.ts && S.seen.ids.indexOf(o.id) < 0; }
+  // an order is known by store + number: both sheets can hold the same number (old main rows numbered PE-…)
+  const keyOf = (o) => o.store + ':' + o.id;
+  const byId = (k) => S.orders.find((o) => keyOf(o) === k);
+  function isNew(o) { return !!S.seen && o.ts > S.seen.ts && S.seen.ids.indexOf(keyOf(o)) < 0; }
   function markSeen(id) {
     if (!S.seen) return;
     if (id) { if (S.seen.ids.indexOf(id) < 0) { S.seen.ids.push(id); S.seen.ids = S.seen.ids.slice(-300); } }
@@ -466,8 +468,8 @@
   function rowHtml(o) {
     const acts = '<button type="button" class="qbtn e" data-edit title="تعديل الطلب" aria-label="تعديل الطلب ' + esc(o.id) + '">' +
       '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg><span>تعديل</span></button>' +
-      (NEXT[o.status] || []).map((a) => '<button type="button" class="qbtn' + (a[2] ? ' x' : '') + '" data-to="' + esc(a[1]) + '"' + (S.pending[o.id] ? ' disabled' : '') + '>' + esc(a[0]) + '</button>').join('');
-    return '<tr data-id="' + esc(o.id) + '" class="' + (isNew(o) ? 'is-new' : '') + (S.open === o.id ? ' is-open' : '') + '" tabindex="0">' +
+      (NEXT[o.status] || []).map((a) => '<button type="button" class="qbtn' + (a[2] ? ' x' : '') + '" data-to="' + esc(a[1]) + '"' + (S.pending[keyOf(o)] ? ' disabled' : '') + '>' + esc(a[0]) + '</button>').join('');
+    return '<tr data-id="' + esc(keyOf(o)) + '" class="' + (isNew(o) ? 'is-new' : '') + (S.open === keyOf(o) ? ' is-open' : '') + '" tabindex="0">' +
       '<td class="c-id"><bdi>' + esc(o.id) + '</bdi>' + (isNew(o) ? '<span class="new-tag">جديد</span>' : '') + '<span class="c-date-m" dir="ltr">' + esc(o.recu) + '</span></td>' +
       '<td class="c-date"><span dir="ltr">' + esc(o.recu) + '</span></td>' +
       '<td class="c-name">' + esc(o.name || '—') + '</td>' +
@@ -475,7 +477,7 @@
       '<td class="c-city">' + esc(o.city || '—') + '</td>' +
       '<td class="c-art"><span>' + esc(o.product) + (o.qty > 1 ? ' <em>× ' + esc(o.qty) + '</em>' : '') + (o.sd ? ' <i class="sd-tag">+ SD</i>' : '') + '</span></td>' +
       '<td class="num c-tot">' + dh(o.total) + '</td>' +
-      '<td class="c-st"><span class="pill' + (S.pending[o.id] ? ' pending' : '') + '" data-k="' + SKEY[o.status] + '">' + esc(o.status) + '</span>' + siftMini(o) + '</td>' +
+      '<td class="c-st"><span class="pill' + (S.pending[keyOf(o)] ? ' pending' : '') + '" data-k="' + SKEY[o.status] + '">' + esc(o.status) + '</span>' + siftMini(o) + '</td>' +
       '<td class="c-act"><span class="qa">' + acts + '</span></td></tr>';
   }
   function renderEmptyError(msg) {
@@ -665,10 +667,10 @@
     const o = byId(id); if (!o) return;
     const btn = el.drawer.querySelector('[data-sift-push]'); if (btn) { btn.disabled = true; btn.textContent = 'جارٍ الإرسال…'; }
     try {
-      const d = await api(storeOf(o.store), 'sift_push', { id: id });
+      const d = await api(storeOf(o.store), 'sift_push', { id: o.id });
       Object.assign(o, d.order, { store: o.store });
-      if (o.sift && o.sift.tracking) toast('SIFT · ' + id + ' · رقم التتبع ' + o.sift.tracking);
-      else toast('SIFT · ' + id + ': ' + ((o.sift && o.sift.message) || 'لم يُحجز بعد'), true);
+      if (o.sift && o.sift.tracking) toast('SIFT · ' + o.id + ' · رقم التتبع ' + o.sift.tracking);
+      else toast('SIFT · ' + o.id + ': ' + ((o.sift && o.sift.message) || 'لم يُحجز بعد'), true);
     } catch (e) {
       toast(errText(e), true);
       if (isAuthErr(e)) { signOut(errText(e)); return; }
@@ -698,7 +700,7 @@
       '<div class="d-row edit-act"><button type="button" class="btn btn-ghost-d" data-edit-cancel>إلغاء</button><button type="submit" class="btn btn-accent" data-edit-save>حفظ التعديلات</button></div></form>';
   }
   function renderDrawer(o, fromRefresh) {
-    if (fromRefresh && S.editing === o.id) return;   // never wipe the edit form while typing
+    if (fromRefresh && S.editing === keyOf(o)) return;   // never wipe the edit form while typing
     const ta = el.drawer.querySelector('#noteTa');
     const editing = fromRefresh && ta && (document.activeElement === ta || ta.value !== ta.defaultValue);
     const draft = editing ? ta.value : null;
@@ -708,18 +710,18 @@
     el.drawer.innerHTML =
       '<div class="d-card d-head"><div class="d-row"><div><div class="d-id"><bdi>' + esc(o.id) + '</bdi> · <span dir="ltr">' + esc(o.recu) + '</span></div><h2 class="d-name" id="dTitle">' + esc(o.name || 'بدون اسم') + '</h2></div>' +
         '<button type="button" class="d-close" data-close aria-label="إغلاق (Esc)"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button></div>' +
-        '<div class="d-row"><span class="d-meta"><span dir="ltr">' + esc(o.phone) + '</span> · ' + esc(o.city || '—') + '</span><span class="pill' + (S.pending[o.id] ? ' pending' : '') + '" data-k="' + SKEY[o.status] + '">' + esc(o.status) + '</span></div>' +
+        '<div class="d-row"><span class="d-meta"><span dir="ltr">' + esc(o.phone) + '</span> · ' + esc(o.city || '—') + '</span><span class="pill' + (S.pending[keyOf(o)] ? ' pending' : '') + '" data-k="' + SKEY[o.status] + '">' + esc(o.status) + '</span></div>' +
         '<div class="d-contact"><a class="btn btn-white" href="tel:' + esc(tel) + '">اتصال</a>' +
         '<a class="btn btn-wa" target="_blank" rel="noopener noreferrer" href="https://wa.me/' + esc(wa212(o.phone)) + '?text=' + encodeURIComponent(waText(o)) + '">واتساب</a>' +
         '<button type="button" class="btn btn-ghost" data-copy="' + esc(o.phone) + '">نسخ الرقم</button></div></div>' +
       siftCard(o) +
       '<div class="d-card"><span class="d-h">الحالة</span><div class="d-status">' +
-        STATUSES.map((s) => '<button type="button" class="sbtn' + (s === o.status ? ' on' : '') + '" data-k="' + SKEY[s] + '" data-to="' + esc(s) + '" aria-pressed="' + (s === o.status) + '"' + (S.pending[o.id] ? ' disabled' : '') + '>' + esc(s) + '</button>').join('') +
+        STATUSES.map((s) => '<button type="button" class="sbtn' + (s === o.status ? ' on' : '') + '" data-k="' + SKEY[s] + '" data-to="' + esc(s) + '" aria-pressed="' + (s === o.status) + '"' + (S.pending[keyOf(o)] ? ' disabled' : '') + '>' + esc(s) + '</button>').join('') +
       '</div></div>' +
-      (S.editing === o.id ? editFormHtml(o) :
+      (S.editing === keyOf(o) ? editFormHtml(o) :
       '<div class="d-card"><div class="d-row"><span class="d-h">المنتج</span><button type="button" class="btn btn-dark btn-sm" data-edit>✎ تعديل الطلب</button></div><div class="items">' +
         '<div class="item"><b>' + esc(o.product || '—') + (o.sd ? ' <i class="sd-tag">+ SD</i>' : '') + '</b><b>' + (o.qty > 1 ? '× ' + esc(o.qty) : '') + '</b><span>' + (o.qty > 1 ? 'سعر الوحدة ' + dh(unit) : 'قطعة واحدة') + '</span></div>' +
-      '</div><div class="sd-row"><span>بطاقة ذاكرة SD</span>' + sdRadios(o, 'sdQuick', S.pending[o.id]) + '</div>' +
+      '</div><div class="sd-row"><span>بطاقة ذاكرة SD</span>' + sdRadios(o, 'sdQuick', S.pending[keyOf(o)]) + '</div>' +
       '<div class="tots"><div><span>الكمية</span><span>' + esc(o.qty) + '</span></div>' +
         '<div><span>التوصيل</span><span>مجاني</span></div>' +
         '<div class="grand"><span>المبلغ المطلوب تحصيله</span><span>' + dh(o.total) + '</span></div></div></div>') +
@@ -745,13 +747,13 @@
     o.hist = (o.hist || []).concat([{ at: '…', from: prev.status, to: to }]);
     render(); if (S.open === id) renderDrawer(o);
     try {
-      const d = await api(storeOf(o.store), 'update', { id: id, status: to });
+      const d = await api(storeOf(o.store), 'update', { id: o.id, status: to });
       delete S.pending[id];
       const cur = byId(id);
       if (cur) Object.assign(cur, d.order, { store: o.store });
-      toast(id + ' ← ' + to);
-      if (d.sift && d.sift.tracking) toast('SIFT · ' + id + ' · رقم التتبع ' + d.sift.tracking);
-      else if (d.sift && d.sift.error) toast('SIFT · ' + id + ': ' + d.sift.error, true);
+      toast(o.id + ' ← ' + to);
+      if (d.sift && d.sift.tracking) toast('SIFT · ' + o.id + ' · رقم التتبع ' + d.sift.tracking);
+      else if (d.sift && d.sift.error) toast('SIFT · ' + o.id + ': ' + d.sift.error, true);
     } catch (e) {
       delete S.pending[id];
       const cur = byId(id);
@@ -774,7 +776,7 @@
   }
   function cancelEdit() {
     const o = byId(S.editing); S.editing = null;
-    if (o && S.open === o.id) renderDrawer(o);
+    if (o && S.open === keyOf(o)) renderDrawer(o);
   }
   function normPhone(p) {
     let d = digits(p);
@@ -809,7 +811,7 @@
     try {
       await sendEdit(o, edit, 'تم حفظ تعديلات الطلب');
       S.editing = null;
-      render(); if (S.open === o.id) renderDrawer(o);
+      render(); if (S.open === keyOf(o)) renderDrawer(o);
     } catch (e) {
       if (isAuthErr(e)) { signOut(errText(e)); return; }
       btn.disabled = false; btn.textContent = 'حفظ التعديلات';
@@ -841,9 +843,9 @@
     if (note === (o.note || '')) { toast('لم تتغيّر الملاحظة'); return; }
     btn.disabled = true; btn.textContent = 'جارٍ الحفظ…';
     try {
-      const d = await api(storeOf(o.store), 'update', { id: id, note: note });
+      const d = await api(storeOf(o.store), 'update', { id: o.id, note: note });
       Object.assign(o, d.order, { store: o.store });
-      toast('تم حفظ الملاحظة · ' + id);
+      toast('تم حفظ الملاحظة · ' + o.id);
       if (S.open === id) renderDrawer(o);
     } catch (e) {
       toast('لم يتم حفظ الملاحظة. ' + errText(e), true);
