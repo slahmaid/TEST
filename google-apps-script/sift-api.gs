@@ -263,7 +263,9 @@ function siftSync_(full) {
   var started = new Date(Date.now() - 2 * 60000).toISOString();
   var items = [], cursor = '', pages = 0;
   do {
-    var q = '?limit=100' + (since ? '&updatedFrom=' + encodeURIComponent(since) : '') + (cursor ? '&cursor=' + encodeURIComponent(cursor) : '');
+    // SIFT only accepts a plain date here (2026-11-27; a date-time is refused as « Invalid ISO date »):
+    // ask from the day before the last sync, so no change is missed whatever the time zone
+    var q = '?limit=100' + (since ? '&updatedFrom=' + new Date(Date.parse(since) - 86400000).toISOString().slice(0, 10) : '') + (cursor ? '&cursor=' + encodeURIComponent(cursor) : '');
     var res = siftFetch_('get', '/orders' + q);
     if (!res.ok) return { ok: false, error: res.error, message: siftErrText_(res.error, res.message) };
     items = items.concat(res.data.items || []);
